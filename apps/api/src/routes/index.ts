@@ -56,7 +56,9 @@ export function buildRouter(s: Services): Router {
       db,
       provider: {
         name: s.provider.name,
-        configured: s.provider.name !== 'anthropic' || !!s.config.anthropicApiKey,
+        model: s.provider.model,
+        // A non-mock provider can only be constructed with its key present.
+        configured: true,
       },
       version: '0.1.0',
     });

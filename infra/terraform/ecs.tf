@@ -34,7 +34,9 @@ locals {
   ]
   api_secrets = [
     { name = "DATABASE_URL", valueFrom = aws_secretsmanager_secret.database_url.arn },
-    { name = "ANTHROPIC_API_KEY", valueFrom = aws_secretsmanager_secret.anthropic_api_key.arn },
+    { name = "ANTHROPIC_API_KEY", valueFrom = aws_secretsmanager_secret.llm["anthropic-api-key"].arn },
+    { name = "OPENAI_API_KEY", valueFrom = aws_secretsmanager_secret.llm["openai-api-key"].arn },
+    { name = "DEEPSEEK_API_KEY", valueFrom = aws_secretsmanager_secret.llm["deepseek-api-key"].arn },
   ]
 }
 

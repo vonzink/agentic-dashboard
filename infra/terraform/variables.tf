@@ -101,9 +101,13 @@ variable "cognito_domain_prefix" {
 }
 
 variable "model_provider" {
-  description = "API model provider: mock (no spend) or anthropic (requires the API-key secret to be set)"
+  description = "Active model provider: mock (no spend), anthropic, openai, or deepseek (set the matching key secret first)"
   type        = string
   default     = "mock"
+  validation {
+    condition     = contains(["mock", "anthropic", "openai", "deepseek"], var.model_provider)
+    error_message = "model_provider must be mock, anthropic, openai, or deepseek."
+  }
 }
 
 variable "require_different_reviewer" {

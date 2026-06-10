@@ -10,17 +10,24 @@ resource "aws_secretsmanager_secret_version" "database_url" {
   secret_string = "postgres://${aws_db_instance.main.username}:${random_password.db.result}@${aws_db_instance.main.endpoint}/${aws_db_instance.main.db_name}"
 }
 
-# Created with a placeholder; set the real key out-of-band:
-#   aws secretsmanager put-secret-value \
-#     --secret-id <name> --secret-string 'sk-ant-...'
-resource "aws_secretsmanager_secret" "anthropic_api_key" {
-  name = "${var.name_prefix}/${var.environment}/anthropic-api-key"
+# LLM provider keys (Claude / ChatGPT / DeepSeek). Each is created with a
+# placeholder; set the real value out-of-band for whichever you use:
+#   aws secretsmanager put-secret-value --secret-id <name> --secret-string '<key>'
+# Terraform never holds or overwrites the real values (ignore_changes).
+locals {
+  llm_secrets = ["anthropic-api-key", "openai-api-key", "deepseek-api-key"]
 }
 
-resource "aws_secretsmanager_secret_version" "anthropic_api_key" {
-  secret_id     = aws_secretsmanager_secret.anthropic_api_key.id
+resource "aws_secretsmanager_secret" "llm" {
+  for_each = toset(local.llm_secrets)
+  name     = "${var.name_prefix}/${var.environment}/${each.key}"
+}
+
+resource "aws_secretsmanager_secret_version" "llm" {
+  for_each      = aws_secretsmanager_secret.llm
+  secret_id     = each.value.id
   secret_string = "REPLACE_ME"
   lifecycle {
-    ignore_changes = [secret_string] # real value is set manually, never by terraform
+    ignore_changes = [secret_string] # real values are set manually, never by terraform
   }
 }

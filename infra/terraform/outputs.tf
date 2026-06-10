@@ -58,7 +58,15 @@ output "cognito_hosted_domain" {
 
 output "anthropic_api_key_secret" {
   description = "Set the real key: aws secretsmanager put-secret-value --secret-id <this>"
-  value       = aws_secretsmanager_secret.anthropic_api_key.name
+  value       = aws_secretsmanager_secret.llm["anthropic-api-key"].name
+}
+
+output "openai_api_key_secret" {
+  value = aws_secretsmanager_secret.llm["openai-api-key"].name
+}
+
+output "deepseek_api_key_secret" {
+  value = aws_secretsmanager_secret.llm["deepseek-api-key"].name
 }
 
 output "public_subnet_ids" {

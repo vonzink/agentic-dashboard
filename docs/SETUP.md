@@ -109,9 +109,9 @@ curl -s :4000/api/ai/tasks/$TASK/audit -H 'x-user-role: viewer' | jq '.items[].e
 | `COGNITO_USER_POOL_ID/REGION/CLIENT_ID` | _(unset)_ | required for `cognito` mode |
 | `COGNITO_GROUP_PREFIX` | _(empty)_ | group→role mapping prefix (e.g. `msfg-`) |
 | `DATABASE_URL` | _(unset)_ | Postgres connection; unset = in-memory store |
-| `MODEL_PROVIDER` | `mock` | `mock` or `anthropic` |
-| `ANTHROPIC_API_KEY` | _(unset)_ | required for `anthropic` provider — env only, never code |
-| `ANTHROPIC_MODEL` | `claude-opus-4-8` | model id used for runs |
+| `MODEL_PROVIDER` | `mock` | `mock`, `anthropic`, `openai`, or `deepseek` |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `DEEPSEEK_API_KEY` | _(unset)_ | key for the active provider — env/Secrets Manager only, never code |
+| `ANTHROPIC_MODEL` / `OPENAI_MODEL` / `DEEPSEEK_MODEL` | `claude-opus-4-8` / `gpt-5` / `deepseek-chat` | model ids per provider |
 | `COST_PER_MTOK_IN/OUT` | `5` / `25` | USD per 1M tokens for `estimated_cost` |
 | `S3_BUCKET` | _(unset)_ | document storage; unset = local disk |
 | `UPLOAD_DIR` | `.data/uploads` | local-disk storage location (dev) |

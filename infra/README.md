@@ -21,10 +21,14 @@ terraform apply
 Then, in order:
 
 ```bash
-# 1. Real Anthropic key (placeholder was created by terraform)
+# 1. LLM keys (placeholders were created by terraform — set the ones you use;
+#    MODEL_PROVIDER in terraform.tfvars picks which one is active)
 aws secretsmanager put-secret-value \
-  --secret-id "$(terraform output -raw anthropic_api_key_secret)" \
-  --secret-string 'sk-ant-...'
+  --secret-id "$(terraform output -raw anthropic_api_key_secret)" --secret-string 'sk-ant-...'
+aws secretsmanager put-secret-value \
+  --secret-id "$(terraform output -raw openai_api_key_secret)" --secret-string 'sk-...'
+aws secretsmanager put-secret-value \
+  --secret-id "$(terraform output -raw deepseek_api_key_secret)" --secret-string 'sk-...'
 
 # 2. Build & push the API image
 aws ecr get-login-password | docker login --username AWS \

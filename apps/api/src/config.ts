@@ -12,9 +12,13 @@ export interface AppConfig {
   /** Required when authMode is 'cognito'. */
   cognito: { region: string; userPoolId: string; clientId: string } | null;
   databaseUrl: string | null;
-  modelProvider: 'mock' | 'anthropic';
+  modelProvider: 'mock' | 'anthropic' | 'openai' | 'deepseek';
   anthropicApiKey: string | null;
   anthropicModel: string;
+  openaiApiKey: string | null;
+  openaiModel: string;
+  deepseekApiKey: string | null;
+  deepseekModel: string;
   /** USD per 1M tokens, for estimated_cost on runs. */
   costPerMTokIn: number;
   costPerMTokOut: number;
@@ -45,6 +49,10 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     modelProvider: (process.env.MODEL_PROVIDER ?? 'mock') as AppConfig['modelProvider'],
     anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? null,
     anthropicModel: process.env.ANTHROPIC_MODEL ?? 'claude-opus-4-8',
+    openaiApiKey: process.env.OPENAI_API_KEY ?? null,
+    openaiModel: process.env.OPENAI_MODEL ?? 'gpt-5',
+    deepseekApiKey: process.env.DEEPSEEK_API_KEY ?? null,
+    deepseekModel: process.env.DEEPSEEK_MODEL ?? 'deepseek-chat',
     costPerMTokIn: Number(process.env.COST_PER_MTOK_IN ?? 5),
     costPerMTokOut: Number(process.env.COST_PER_MTOK_OUT ?? 25),
     s3Bucket: process.env.S3_BUCKET ?? null,
@@ -64,6 +72,12 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   }
   if (config.modelProvider === 'anthropic' && !config.anthropicApiKey) {
     throw new Error('MODEL_PROVIDER=anthropic requires ANTHROPIC_API_KEY');
+  }
+  if (config.modelProvider === 'openai' && !config.openaiApiKey) {
+    throw new Error('MODEL_PROVIDER=openai requires OPENAI_API_KEY');
+  }
+  if (config.modelProvider === 'deepseek' && !config.deepseekApiKey) {
+    throw new Error('MODEL_PROVIDER=deepseek requires DEEPSEEK_API_KEY');
   }
   return config;
 }

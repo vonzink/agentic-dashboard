@@ -27,10 +27,10 @@ resource "aws_iam_role_policy" "task_execution_secrets" {
     Statement = [{
       Effect = "Allow"
       Action = ["secretsmanager:GetSecretValue"]
-      Resource = [
-        aws_secretsmanager_secret.database_url.arn,
-        aws_secretsmanager_secret.anthropic_api_key.arn,
-      ]
+      Resource = concat(
+        [aws_secretsmanager_secret.database_url.arn],
+        [for s in aws_secretsmanager_secret.llm : s.arn],
+      )
     }]
   })
 }
