@@ -78,7 +78,7 @@ function StructuredBody({ output }: { output: AiOutput }) {
                   <td>{String(d.name ?? '')}</td>
                   <td>{String(d.reason ?? '')}</td>
                   <td>{String(d.when_needed ?? '')}</td>
-                  <td>{d.required ? <Badge value="high" prefix="" /> : <span className="muted">optional</span>}</td>
+                  <td>{d.required ? <span className="badge amber">required</span> : <span className="muted">optional</span>}</td>
                 </tr>
               ))}
             </tbody>

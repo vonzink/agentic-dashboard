@@ -53,8 +53,11 @@ ai_workflow_configs (standalone; one row per workflow)
    (`enforce_action_approval`), so even a buggy new endpoint cannot bypass
    the gate.
 7. Every state change writes an **ai_audit_events** row in the same
-   transaction. The table is append-only: a trigger rejects UPDATE/DELETE,
-   and the app's DB role should not be granted those privileges either.
+   request, immediately after the change. The table is append-only: a
+   trigger rejects UPDATE/DELETE, and the app's DB role should not be
+   granted those privileges either. (Wrapping each state-change + audit
+   pair in one DB transaction via a `withTransaction` store method is a
+   known Sprint 4 hardening item — see review findings in the build log.)
 
 ## Design decisions worth knowing
 

@@ -98,8 +98,9 @@ split into services only when a seam proves itself.
   external systems. External effects exist solely as `ai_integration_actions`
   rows, and the execute path refuses to run without an `approved`/`FINALIZED`
   approval record. The "act" code path is unreachable pre-approval.
-- **Audit-first:** the audit record is written *in the same transaction* as
-  the run state change, not as fire-and-forget logging. Required fields per
+- **Audit-first:** every state change writes its audit record synchronously
+  in the same request (never fire-and-forget logging); wrapping each pair in
+  a single DB transaction is a Sprint 4 hardening item. Required fields per
   the compliance spec: user, timestamp, input, workflow, retrieved sources,
   provider/model, prompt version, raw output, approval status, final edited
   output, action taken.

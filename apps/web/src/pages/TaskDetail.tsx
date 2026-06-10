@@ -136,7 +136,7 @@ function RunDialog({ task }: { task: TaskDetail }) {
   );
 }
 
-function OutputActions({ output }: { output: AiOutput }) {
+function OutputActions({ output, finalContent }: { output: AiOutput; finalContent?: string | null }) {
   const role = loadDevUser().role;
   const canReview = role === 'reviewer' || role === 'admin';
   const approve = useApproveOutput();
@@ -178,8 +178,9 @@ function OutputActions({ output }: { output: AiOutput }) {
           Finalize
         </button>
       )}
-      <button className="btn ghost sm" style={{ marginLeft: canReview ? 8 : 0 }} onClick={() => copyFinalText(output)}>
-        Copy response
+      <button className="btn ghost sm" style={{ marginLeft: canReview ? 8 : 0 }}
+        onClick={() => copyFinalText(output, finalContent)}>
+        Copy {finalContent ? 'final (edited) ' : ''}response
       </button>
       {err != null && <ErrorState error={err} />}
     </div>
@@ -242,10 +243,14 @@ export function TaskDetailPage() {
       <div className="panel">
         <h2>AI outputs</h2>
         {t.outputs.length === 0 && <EmptyState message="Run a workflow to generate a draft for review." />}
-        {t.outputs.map((o) => (
-          <OutputCard key={o.id} output={o} citations={o.citations}
-            actions={<OutputActions output={o} />} />
-        ))}
+        {t.outputs.map((o) => {
+          // The reviewer's edited version (if any) is the real "final" text.
+          const latestApproval = t.approvals.find((a) => a.output_id === o.id);
+          return (
+            <OutputCard key={o.id} output={o} citations={o.citations}
+              actions={<OutputActions output={o} finalContent={latestApproval?.edited_final_content} />} />
+          );
+        })}
       </div>
 
       {t.actions.length > 0 && (

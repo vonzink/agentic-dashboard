@@ -14,7 +14,11 @@ function PromptGroup({ name, versions }: { name: string; versions: PromptTemplat
     <div className="panel">
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         <strong style={{ flex: 1 }}>{titleCase(name)}</strong>
-        {active ? <Badge value="APPROVED" prefix={`active v${active.version}`} /> : <Badge value="LOW" prefix="no active version" />}
+        {active ? (
+          <span className="badge green">active: v{active.version}</span>
+        ) : (
+          <span className="badge red">no active version</span>
+        )}
         <button className="btn sm ghost" onClick={() => setOpen(!open)}>{open ? 'collapse' : 'versions'}</button>
       </div>
       {open && (

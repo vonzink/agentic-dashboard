@@ -20,9 +20,13 @@ export function NewTaskPage() {
   const createTask = useCreateTask();
   const createDocument = useCreateDocument();
 
+  const VALID_TYPES: TaskType[] = ['condition_response', 'borrower_email', 'document_checklist', 'sop_lookup', 'general'];
+  const requested = params.get('task_type');
   const [form, setForm] = useState({
     title: '',
-    task_type: (params.get('task_type') ?? 'condition_response') as TaskType,
+    task_type: (VALID_TYPES as string[]).includes(requested ?? '')
+      ? (requested as TaskType)
+      : 'condition_response',
     priority: 'normal',
     borrower_reference: '',
     loan_reference: '',
@@ -98,7 +102,7 @@ export function NewTaskPage() {
           Task type *
           <select value={form.task_type}
             onChange={(e) => setForm({ ...form, task_type: e.target.value as TaskType })}>
-            {['condition_response', 'borrower_email', 'document_checklist', 'sop_lookup', 'general'].map((t) => (
+            {VALID_TYPES.map((t) => (
               <option key={t} value={t}>{titleCase(t)}</option>
             ))}
           </select>
