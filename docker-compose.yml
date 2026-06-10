@@ -1,0 +1,22 @@
+# Local development infrastructure only. Production uses RDS — see
+# docs/AGENTIC_DASHBOARD_AWS_DEPLOYMENT.md.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: agentic-dashboard-db
+    environment:
+      POSTGRES_USER: agentic
+      POSTGRES_PASSWORD: agentic_dev_password # local-only credential
+      POSTGRES_DB: agentic_dashboard
+    ports:
+      - "5432:5432"
+    volumes:
+      - agentic_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentic -d agentic_dashboard"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  agentic_pgdata:

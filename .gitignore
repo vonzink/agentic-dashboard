@@ -1,0 +1,18 @@
+# dependencies
+node_modules/
+
+# environment — never commit secrets
+.env
+.env.*
+!.env.example
+
+# build output
+dist/
+build/
+apps/web/dist/
+
+# logs & junk
+*.log
+.DS_Store
+coverage/
+.vite/
