@@ -8,6 +8,7 @@ import { AuditService } from './audit';
 import { DocumentService } from './documents';
 import { PromptService } from './prompts';
 import { RunService } from './runs';
+import { createStorage, type BlobStorage } from './storage';
 import { TaskService } from './tasks';
 
 export interface Services {
@@ -19,18 +20,23 @@ export interface Services {
   approvals: ApprovalService;
   actions: ActionService;
   provider: ModelProvider;
+  storage: BlobStorage;
   store: Store;
   config: AppConfig;
 }
 
-export function buildServices(store: Store, config: AppConfig): Services {
+export function buildServices(store: Store, config: AppConfig, storage?: BlobStorage): Services {
   const audit = new AuditService(store);
   const tasks = new TaskService(store, audit);
-  const documents = new DocumentService(store, audit);
+  const blobStorage = storage ?? createStorage(config);
+  const documents = new DocumentService(store, audit, blobStorage);
   const prompts = new PromptService(store, audit);
   const provider = createProvider(config, mockOutputFor);
   const runs = new RunService(store, audit, tasks, prompts, provider, config);
   const approvals = new ApprovalService(store, audit, config);
   const actions = new ActionService(store, audit, config);
-  return { audit, tasks, documents, prompts, runs, approvals, actions, provider, store, config };
+  return {
+    audit, tasks, documents, prompts, runs, approvals, actions,
+    provider, storage: blobStorage, store, config,
+  };
 }

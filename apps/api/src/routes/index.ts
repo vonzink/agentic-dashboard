@@ -1,4 +1,5 @@
 import { Router, type Request } from 'express';
+import multer from 'multer';
 import type { Services } from '../services';
 import { currentUser, requireRole } from '../middleware/auth';
 import { ApiError } from '../middleware/error';
@@ -20,6 +21,7 @@ import {
   rejectBody,
   updatePromptBody,
   updateTaskBody,
+  uploadDocumentFields,
 } from '../types/dto';
 import { PLANNED_WORKFLOWS, WORKFLOWS } from '../workflows/registry';
 
@@ -172,6 +174,18 @@ export function buildRouter(s: Services): Router {
   });
 
   // ----- documents -------------------------------------------------------------
+  const uploads = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 15 * 1024 * 1024, files: 1 },
+  });
+
+  r.post('/documents/upload', requireRole('operator'), uploads.single('file'), async (req, res) => {
+    if (!req.file) throw ApiError.badRequest("multipart field 'file' is required");
+    const meta = uploadDocumentFields.parse(req.body ?? {});
+    const doc = await s.documents.upload(currentUser(req), req.file, meta);
+    res.status(201).json(doc);
+  });
+
   r.post('/documents', requireRole('operator'), async (req, res) => {
     const body = createDocumentBody.parse(req.body);
     res.status(201).json(await s.documents.create(currentUser(req), body));

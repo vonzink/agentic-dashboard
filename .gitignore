@@ -16,3 +16,6 @@ apps/web/dist/
 .DS_Store
 coverage/
 .vite/
+
+# local upload storage (dev)
+.data/

@@ -1,14 +1,86 @@
+import { randomUUID } from 'node:crypto';
+import { basename } from 'node:path';
 import { ApiError } from '../middleware/error';
 import type { Page, Store } from '../repositories/interfaces';
 import type { AuthUser, SourceChunk, SourceDocument } from '../types/domain';
 import type { Classification, DocumentType } from '../types/statuses';
 import type { AuditService } from './audit';
+import { chunkText, extractText } from './extraction';
+import type { BlobStorage } from './storage';
+
+export interface UploadedFile {
+  originalname: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+}
 
 export class DocumentService {
   constructor(
     private store: Store,
     private audit: AuditService,
+    private storage: BlobStorage,
   ) {}
+
+  /**
+   * Stores an uploaded file (S3 in AWS, local disk in dev), extracts text
+   * from text-native formats and chunks it for citation. Binary formats
+   * (PDF, images, Office) are stored with extraction_status='pending' for
+   * the Phase 3 OCR pipeline — never silently "extracted".
+   */
+  async upload(
+    actor: AuthUser,
+    file: UploadedFile,
+    opts: { document_type: DocumentType; classification: Classification },
+  ): Promise<SourceDocument & { chunks: SourceChunk[] }> {
+    const filename = basename(file.originalname).replace(/[^\w.\- ()]/g, '_') || 'upload';
+    const key = `documents/${randomUUID()}/${filename}`;
+    const stored = await this.storage.put(key, file.buffer, file.mimetype);
+
+    const text = extractText(file.buffer, file.mimetype, filename);
+    const doc = await this.store.documents.create({
+      filename,
+      file_type: file.mimetype || null,
+      s3_bucket: stored.bucket,
+      s3_key: stored.key,
+      text_extraction_status: text ? 'succeeded' : 'pending',
+      document_type: opts.document_type,
+      classification: opts.classification,
+      created_by: actor.email,
+      metadata_json: { storage: this.storage.kind, size_bytes: file.size },
+    });
+
+    const chunks: SourceChunk[] = [];
+    if (text) {
+      for (const [index, content] of chunkText(text).entries()) {
+        chunks.push(
+          await this.store.chunks.create({
+            document_id: doc.id,
+            chunk_index: index,
+            content,
+            page_number: null,
+            section_label: null,
+            embedding_id: null,
+          }),
+        );
+      }
+    }
+
+    await this.audit.record('document.uploaded', {
+      actor: actor.email,
+      payload: {
+        document_id: doc.id,
+        filename,
+        content_type: file.mimetype,
+        size_bytes: file.size,
+        storage: this.storage.kind,
+        classification: doc.classification,
+        extraction: doc.text_extraction_status,
+        chunk_count: chunks.length,
+      },
+    });
+    return { ...doc, chunks };
+  }
 
   /**
    * Creates a document record. MVP: metadata + optional manual snippet text

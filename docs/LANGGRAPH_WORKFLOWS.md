@@ -50,10 +50,13 @@ Key properties:
 | `borrower_email_draft` | borrower_email | summary, email_subject, email_body, checklist, caveats | Post-check flags approval/denial/rate-commitment wording |
 | `document_checklist_builder` | document_checklist | summary, documents[{name, reason, when_needed, required}], next steps | Flags unverified lender overlays |
 | `sop_lookup_answer` | sop_lookup | summary, answer, citations | Answers ONLY from provided sources; no sources ⇒ LOW confidence + warning; weak/uncited sources ⇒ warning |
+| `income_review` | income_review | summary, findings, red_flags, missing_items, next steps | Advisory only; no sources ⇒ LOW confidence; always warns that licensed staff decide |
+| `asset_review` | asset_review | (same shape) | Funds-to-close, large deposits, sourcing gaps |
+| `credit_review` | credit_review | (same shape) | Disputes, inquiries, undisclosed debts; never implies a credit decision |
+| `title_insurance_review` | title_insurance_review | (same shape) | Vesting, liens, coverage gaps |
 
-Planned agents (configs exist, `is_active=false`, no implementation):
-income_review, asset_review, credit_review, title_insurance_review,
-website_qa.
+Planned agents (config exists, `is_active=false`, no implementation):
+website_qa (Phase 3).
 
 ## Adding a workflow
 

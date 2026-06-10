@@ -114,7 +114,7 @@ describe('AUTH_MODE=cognito end-to-end', () => {
       databaseUrl: null,
       modelProvider: 'mock',
     });
-    const { app } = buildApp(store, config, verifier);
+    const { app } = buildApp(store, config, { verifier });
 
     // No token → 401
     await request(app).get('/api/ai/tasks').expect(401);

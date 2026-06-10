@@ -18,6 +18,9 @@ export interface AppConfig {
   /** USD per 1M tokens, for estimated_cost on runs. */
   costPerMTokIn: number;
   costPerMTokOut: number;
+  /** Document blob storage: S3 when set, local disk otherwise. */
+  s3Bucket: string | null;
+  uploadDir: string;
   /** Reviewers may not approve their own runs when true (recommended outside local). */
   requireDifferentReviewer: boolean;
   /** Master switch for executing integration actions. Off = propose-only mode. */
@@ -44,6 +47,8 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     anthropicModel: process.env.ANTHROPIC_MODEL ?? 'claude-opus-4-8',
     costPerMTokIn: Number(process.env.COST_PER_MTOK_IN ?? 5),
     costPerMTokOut: Number(process.env.COST_PER_MTOK_OUT ?? 25),
+    s3Bucket: process.env.S3_BUCKET ?? null,
+    uploadDir: process.env.UPLOAD_DIR ?? '.data/uploads',
     requireDifferentReviewer: process.env.REQUIRE_DIFFERENT_REVIEWER === 'true',
     integrationExecutionEnabled: process.env.INTEGRATION_EXECUTION_ENABLED === 'true',
     ...overrides,

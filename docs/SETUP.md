@@ -113,6 +113,8 @@ curl -s :4000/api/ai/tasks/$TASK/audit -H 'x-user-role: viewer' | jq '.items[].e
 | `ANTHROPIC_API_KEY` | _(unset)_ | required for `anthropic` provider — env only, never code |
 | `ANTHROPIC_MODEL` | `claude-opus-4-8` | model id used for runs |
 | `COST_PER_MTOK_IN/OUT` | `5` / `25` | USD per 1M tokens for `estimated_cost` |
+| `S3_BUCKET` | _(unset)_ | document storage; unset = local disk |
+| `UPLOAD_DIR` | `.data/uploads` | local-disk storage location (dev) |
 | `REQUIRE_DIFFERENT_REVIEWER` | `false` | forbid self-review (enable outside local) |
 | `INTEGRATION_EXECUTION_ENABLED` | `false` | master switch; false = propose-only |
 | `VITE_ENV` | `local` | web env badge |

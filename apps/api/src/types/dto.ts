@@ -99,6 +99,12 @@ export const createDocumentBody = z.object({
   metadata_json: jsonObject.default({}),
 });
 
+/** Multipart text fields accompanying POST /documents/upload. */
+export const uploadDocumentFields = z.object({
+  document_type: z.enum(DOCUMENT_TYPES).default('other'),
+  classification: z.enum(CLASSIFICATIONS).default('internal'),
+});
+
 export const listDocumentsQuery = paginationQuery.extend({
   document_type: z.enum(DOCUMENT_TYPES).optional(),
 });

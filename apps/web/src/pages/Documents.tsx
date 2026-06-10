@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { apiUpload } from '../api/client';
 import { useAddChunk, useCreateDocument, useDocument, useDocuments } from '../api/hooks';
-import type { Classification, DocumentType } from '../api/types';
+import type { Classification, DocumentDetail, DocumentType } from '../api/types';
 import { Badge } from '../components/Badge';
 import { Pager } from '../components/Pager';
 import { EmptyState, ErrorState, Loading } from '../components/States';
@@ -10,6 +12,76 @@ const DOC_TYPES: DocumentType[] = [
   'sop', 'guideline', 'condition_sheet', 'paystub', 'bank_statement', 'tax_return',
   'credit_report', 'title_doc', 'insurance_doc', 'correspondence', 'manual_snippet', 'other',
 ];
+
+function UploadForm({ onCreated }: { onCreated: (id: string) => void }) {
+  const qc = useQueryClient();
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [docType, setDocType] = useState<DocumentType>('sop');
+  const [classification, setClassification] = useState<Classification>('internal');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const [result, setResult] = useState<string>('');
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const file = fileInput.current?.files?.[0];
+    if (!file) return setError(new Error('Choose a file first.'));
+    setBusy(true);
+    setError(null);
+    setResult('');
+    try {
+      const doc = await apiUpload<DocumentDetail>('/documents/upload', file, {
+        document_type: docType,
+        classification,
+      });
+      setResult(
+        doc.text_extraction_status === 'succeeded'
+          ? `Uploaded and extracted ${doc.chunks?.length ?? 0} chunk(s) — ready to cite.`
+          : 'Uploaded. Text extraction is pending (binary formats are handled by the OCR pipeline in a later phase).',
+      );
+      if (fileInput.current) fileInput.current.value = '';
+      void qc.invalidateQueries({ queryKey: ['documents'] });
+      onCreated(doc.id);
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form className="panel" onSubmit={submit}>
+      <h2>Upload document</h2>
+      <p className="muted">
+        Text formats (.txt, .md, .csv, …) are extracted and chunked for citations immediately.
+        PDFs and images are stored awaiting the extraction pipeline.
+      </p>
+      <div className="row" style={{ alignItems: 'flex-end' }}>
+        <label className="field grow">
+          File
+          <input type="file" ref={fileInput} />
+        </label>
+        <label className="field">
+          Type
+          <select value={docType} onChange={(e) => setDocType(e.target.value as DocumentType)}>
+            {DOC_TYPES.map((t) => <option key={t} value={t}>{titleCase(t)}</option>)}
+          </select>
+        </label>
+        <label className="field">
+          Classification
+          <select value={classification} onChange={(e) => setClassification(e.target.value as Classification)}>
+            {(['public', 'internal', 'borrower_pii'] as const).map((c) => (
+              <option key={c} value={c}>{titleCase(c)}</option>
+            ))}
+          </select>
+        </label>
+        <button className="btn primary" disabled={busy}>{busy ? 'Uploading…' : 'Upload'}</button>
+      </div>
+      {result && <div className="banner info">{result}</div>}
+      {error != null && <ErrorState error={error} />}
+    </form>
+  );
+}
 
 function AddDocumentForm({ onCreated }: { onCreated: (id: string) => void }) {
   const create = useCreateDocument();
@@ -41,7 +113,7 @@ function AddDocumentForm({ onCreated }: { onCreated: (id: string) => void }) {
         );
       }}
     >
-      <h2>Add source</h2>
+      <h2>Add manual snippet</h2>
       <div className="row">
         <label className="field grow">
           Name / label *
@@ -66,7 +138,7 @@ function AddDocumentForm({ onCreated }: { onCreated: (id: string) => void }) {
         </label>
       </div>
       <label className="field">
-        Snippet text (becomes the first chunk; uploads come in Phase 2)
+        Snippet text (becomes the first chunk)
         <textarea value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} />
       </label>
       <div className="row">
@@ -149,6 +221,7 @@ export function DocumentsPage() {
 
   return (
     <div>
+      <UploadForm onCreated={setSelected} />
       <AddDocumentForm onCreated={setSelected} />
 
       <div className="panel">

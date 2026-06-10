@@ -6,20 +6,21 @@ import { errorHandler, notFoundHandler } from './middleware/error';
 import type { Store } from './repositories/interfaces';
 import { buildRouter } from './routes';
 import { buildServices, type Services } from './services';
+import type { BlobStorage } from './services/storage';
 
 /** Wires the Express app from a store + config (testable composition root).
- * `verifier` lets tests inject a CognitoVerifier backed by a local JWKS. */
+ * `deps` lets tests inject a CognitoVerifier (local JWKS) or a BlobStorage. */
 export function buildApp(
   store: Store,
   config: AppConfig,
-  verifier?: CognitoVerifier,
+  deps: { verifier?: CognitoVerifier; storage?: BlobStorage } = {},
 ): { app: express.Express; services: Services } {
-  const services = buildServices(store, config);
+  const services = buildServices(store, config, deps.storage);
   const app = express();
 
   app.disable('x-powered-by');
   app.use(express.json({ limit: '2mb' }));
-  app.use('/api/ai', authMiddleware(config, verifier), buildRouter(services));
+  app.use('/api/ai', authMiddleware(config, deps.verifier), buildRouter(services));
   app.use(notFoundHandler);
   app.use(errorHandler);
 

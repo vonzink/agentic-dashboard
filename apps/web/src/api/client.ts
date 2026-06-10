@@ -97,3 +97,41 @@ export function friendlyErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   return 'Something went wrong.';
 }
+
+/** Multipart upload (no JSON content-type; browser sets the boundary). */
+export async function apiUpload<T>(
+  path: string,
+  file: File,
+  fields: Record<string, string> = {},
+): Promise<T> {
+  const user = loadDevUser();
+  const form = new FormData();
+  form.append('file', file);
+  for (const [k, v] of Object.entries(fields)) form.append(k, v);
+
+  let response: Response;
+  try {
+    response = await fetchImpl(`/api/ai${path}`, {
+      method: 'POST',
+      headers: { 'x-user-email': user.email, 'x-user-role': user.role },
+      body: form as unknown as BodyInit,
+    });
+  } catch {
+    throw new ApiError(0, 'NETWORK_ERROR', 'Could not reach the API. Is the backend running?');
+  }
+  if (!response.ok) {
+    let body: ApiErrorBody | null = null;
+    try {
+      body = (await response.json()) as ApiErrorBody;
+    } catch {
+      // non-JSON error body
+    }
+    throw new ApiError(
+      response.status,
+      body?.error?.code ?? `HTTP_${response.status}`,
+      body?.error?.message ?? `Upload failed with status ${response.status}`,
+      body?.error?.details,
+    );
+  }
+  return (await response.json()) as T;
+}
