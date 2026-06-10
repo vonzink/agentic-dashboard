@@ -342,5 +342,5 @@ COMMIT;
 
 -- ============================================================================
 -- Seed data (safe, non-borrower): default workflow configs + prompt v1 rows
--- are inserted by migration 0002 in apps/api/migrations/, not here.
+-- are inserted by "npm run db:seed" (src/db/seed.ts), not by migrations.
 -- ============================================================================
