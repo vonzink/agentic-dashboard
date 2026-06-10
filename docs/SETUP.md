@@ -105,7 +105,9 @@ curl -s :4000/api/ai/tasks/$TASK/audit -H 'x-user-role: viewer' | jq '.items[].e
 |---|---|---|
 | `APP_ENV` | `local` | local / dev / staging / production (production forbids dev auth) |
 | `PORT` | `4000` | API port |
-| `AUTH_MODE` | `dev` | `dev` (header identity) or `cognito` (fail-closed until Phase 2) |
+| `AUTH_MODE` | `dev` | `dev` (header identity) or `cognito` (Bearer JWT vs pool JWKS) |
+| `COGNITO_USER_POOL_ID/REGION/CLIENT_ID` | _(unset)_ | required for `cognito` mode |
+| `COGNITO_GROUP_PREFIX` | _(empty)_ | group→role mapping prefix (e.g. `msfg-`) |
 | `DATABASE_URL` | _(unset)_ | Postgres connection; unset = in-memory store |
 | `MODEL_PROVIDER` | `mock` | `mock` or `anthropic` |
 | `ANTHROPIC_API_KEY` | _(unset)_ | required for `anthropic` provider — env only, never code |

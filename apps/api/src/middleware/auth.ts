@@ -2,6 +2,7 @@ import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import type { AppConfig } from '../config';
 import type { AuthUser } from '../types/domain';
 import { ROLE_RANK, ROLES, type Role } from '../types/statuses';
+import { bearerToken, CognitoVerifier } from './cognito';
 import { ApiError } from './error';
 
 declare global {
@@ -16,26 +17,25 @@ declare global {
 /**
  * AUTH_MODE=dev: identity comes from x-user-email / x-user-role headers.
  * This is for local development ONLY and refuses to load in production
- * (enforced in loadConfig). Replaced by Cognito JWT verification in AWS.
+ * (enforced in loadConfig).
  *
- * AUTH_MODE=cognito: fail-closed placeholder. Verifying Cognito JWTs
- * (issuer https://cognito-idp.<region>.amazonaws.com/<poolId>, JWKS
- * signature, aud/client_id, token_use, exp) is Phase 2 work — until that
- * lands, every request is rejected rather than trusted.
+ * AUTH_MODE=cognito: Authorization: Bearer <jwt>, verified against the
+ * user pool's JWKS; Cognito groups map to roles (see middleware/cognito.ts).
  */
-export function authMiddleware(config: AppConfig): RequestHandler {
-  return (req: Request, _res: Response, next: NextFunction) => {
-    if (config.authMode === 'cognito') {
-      next(
-        new ApiError(
-          501,
-          'AUTH_NOT_CONFIGURED',
-          'Cognito JWT verification is not enabled yet; refusing to authenticate',
-        ),
-      );
-      return;
-    }
+export function authMiddleware(config: AppConfig, verifier?: CognitoVerifier): RequestHandler {
+  if (config.authMode === 'cognito') {
+    const cognito = verifier ?? new CognitoVerifier(config.cognito!);
+    return async (req: Request, _res: Response, next: NextFunction) => {
+      try {
+        req.user = await cognito.verify(bearerToken(req.header('authorization')));
+        next();
+      } catch (err) {
+        next(err);
+      }
+    };
+  }
 
+  return (req: Request, _res: Response, next: NextFunction) => {
     const email = (req.header('x-user-email') ?? 'dev@msfg.local').trim().toLowerCase();
     // Least privilege: requests that don't state a role get read-only access.
     const roleHeader = (req.header('x-user-role') ?? 'viewer').trim().toLowerCase();
