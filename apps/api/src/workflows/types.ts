@@ -85,6 +85,16 @@ export const sopLookupSchema = z.object({
   ...common,
 });
 
+/** Shared shape for the file-review agents (income/asset/credit/title). */
+export const fileReviewSchema = z.object({
+  summary: z.string(),
+  findings: z.array(z.string()).default([]),
+  red_flags: z.array(z.string()).default([]),
+  missing_items: z.array(z.string()).default([]),
+  recommended_next_steps: z.array(z.string()).default([]),
+  ...common,
+});
+
 export interface WorkflowResult {
   /** Validated structured output (one of the schemas above). */
   structured: Record<string, unknown>;

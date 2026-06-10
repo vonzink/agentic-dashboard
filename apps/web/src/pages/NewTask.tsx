@@ -11,6 +11,10 @@ const PRIMARY_INPUT: Partial<Record<TaskType, InputType>> = {
   sop_lookup: 'question',
   borrower_email: 'instruction',
   document_checklist: 'scenario',
+  income_review: 'scenario',
+  asset_review: 'scenario',
+  credit_review: 'scenario',
+  title_insurance_review: 'scenario',
 };
 
 export function NewTaskPage() {
@@ -20,7 +24,10 @@ export function NewTaskPage() {
   const createTask = useCreateTask();
   const createDocument = useCreateDocument();
 
-  const VALID_TYPES: TaskType[] = ['condition_response', 'borrower_email', 'document_checklist', 'sop_lookup', 'general'];
+  const VALID_TYPES: TaskType[] = [
+    'condition_response', 'borrower_email', 'document_checklist', 'sop_lookup',
+    'income_review', 'asset_review', 'credit_review', 'title_insurance_review', 'general',
+  ];
   const requested = params.get('task_type');
   const [form, setForm] = useState({
     title: '',

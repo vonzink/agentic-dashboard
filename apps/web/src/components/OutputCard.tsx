@@ -63,6 +63,15 @@ function StructuredBody({ output }: { output: AiOutput }) {
   return (
     <div>
       {summary && <p>{summary}</p>}
+      <List title="Findings" items={s.findings} />
+      {Array.isArray(s.red_flags) && (s.red_flags as string[]).length > 0 && (
+        <>
+          <h3>Red flags</h3>
+          {(s.red_flags as string[]).map((r, i) => (
+            <div className="banner warn" key={i}>{r}</div>
+          ))}
+        </>
+      )}
       <List title="Missing items" items={s.missing_items} />
       <List title="Checklist" items={s.checklist} />
       {Array.isArray(s.documents) && s.documents.length > 0 && (

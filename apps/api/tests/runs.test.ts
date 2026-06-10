@@ -81,13 +81,17 @@ describe('workflow runs', () => {
     expect(res.status).toBe(400);
   });
 
-  it('runs all four implemented workflows end to end', async () => {
+  it('runs all eight implemented workflows end to end', async () => {
     const { app } = await buildTestApp();
     for (const [workflow, taskType] of [
       ['condition_response_draft', 'condition_response'],
       ['borrower_email_draft', 'borrower_email'],
       ['document_checklist_builder', 'document_checklist'],
       ['sop_lookup_answer', 'sop_lookup'],
+      ['income_review', 'income_review'],
+      ['asset_review', 'asset_review'],
+      ['credit_review', 'credit_review'],
+      ['title_insurance_review', 'title_insurance_review'],
     ] as const) {
       const task = await createTask(app, as.operator, { title: workflow, task_type: taskType });
       await addInput(app, task.id, { input_type: 'other', content: 'Synthetic test context.' });

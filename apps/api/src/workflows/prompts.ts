@@ -141,6 +141,77 @@ Respond with JSON exactly matching:
   },
 ];
 
+/** Shared user-prompt template for the file-review agents. */
+function fileReviewTemplate(focus: string, focusInstructions: string): string {
+  return `Perform an advisory ${focus} review of the loan-file context below. You review and recommend — you NEVER approve, deny, or decide. Base every finding strictly on the provided context and sources; if something cannot be verified from them, list it under missing_items or warnings instead of assuming.
+
+${focusInstructions}
+
+FILE CONTEXT / NOTES:
+{{primary_text}}
+
+BORROWER CONTEXT (may be empty):
+{{borrower_context}}
+
+LOAN TYPE: {{loan_type}}
+SOURCE SNIPPETS (cite these when used):
+{{sources}}
+
+Respond with JSON exactly matching:
+{
+  "summary": "concise overview of what was reviewed and the overall picture",
+  "findings": ["specific, verifiable observations grounded in the context"],
+  "red_flags": ["items needing scrutiny — inconsistencies, gaps, anomalies"],
+  "missing_items": ["documents or explanations still needed"],
+  "recommended_next_steps": ["concrete next steps for staff"],
+  "citations": [{"source_label": "...", "citation_text": "exact text relied on", "page_number": null}],
+  "confidence_label": "HIGH|MEDIUM|LOW",
+  "requires_human_review": true,
+  "warnings": ["caveats and uncertainty a reviewer must check"]
+}`;
+}
+
+export const FILE_REVIEW_PROMPTS: DefaultPrompt[] = [
+  {
+    name: 'income_review',
+    task_type: 'income_review',
+    system_prompt: COMPLIANCE_PREAMBLE,
+    user_prompt_template: fileReviewTemplate(
+      'income-documentation',
+      'Focus on: consistency of stated income across documents; pay frequency vs. YTD math; employment gaps; variable income (bonus/overtime/commission) trends; self-employment indicators that change documentation requirements.',
+    ),
+  },
+  {
+    name: 'asset_review',
+    task_type: 'asset_review',
+    system_prompt: COMPLIANCE_PREAMBLE,
+    user_prompt_template: fileReviewTemplate(
+      'asset/bank-statement',
+      'Focus on: sufficiency of funds to close vs. stated estimates; large or irregular deposits needing sourcing; account ownership matching the borrower; overdrafts/NSF indicators; gift funds and their documentation trail.',
+    ),
+  },
+  {
+    name: 'credit_review',
+    task_type: 'credit_review',
+    system_prompt: COMPLIANCE_PREAMBLE,
+    user_prompt_template: fileReviewTemplate(
+      'credit-report',
+      'Focus on: disputed accounts; recent inquiries and potential undisclosed debt; payment-history patterns described in the context; derogatory events and their timing; debts appearing in context but not in stated liabilities. Never state or imply a credit decision.',
+    ),
+  },
+  {
+    name: 'title_insurance_review',
+    task_type: 'title_insurance_review',
+    system_prompt: COMPLIANCE_PREAMBLE,
+    user_prompt_template: fileReviewTemplate(
+      'title/insurance',
+      'Focus on: vesting and names matching the application; liens, judgments, and exceptions on the commitment; legal description consistency; insurance coverage amounts and effective dates vs. closing timeline; missing endorsements typically required for this loan type.',
+    ),
+  },
+];
+
+DEFAULT_PROMPTS.push(...FILE_REVIEW_PROMPTS);
+
 /** {{placeholder}} substitution; unknown placeholders render as ''. */
 export function renderTemplate(template: string, vars: Record<string, string>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => vars[key] ?? '');

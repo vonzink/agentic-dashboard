@@ -1,8 +1,10 @@
 import type { ConfidenceLabel } from '../types/statuses';
+import type { TaskType } from '../types/statuses';
 import {
   borrowerEmailSchema,
   conditionResponseSchema,
   documentChecklistSchema,
+  fileReviewSchema,
   renderSources,
   sopLookupSchema,
   type WorkflowDefinition,
@@ -163,19 +165,118 @@ export const sopLookupAnswer: WorkflowDefinition = {
   },
 };
 
+/**
+ * File-review agents (Phase 2). All share the same structured shape and
+ * the same hard constraint: they review and recommend — they never decide.
+ * `focus` differentiates the prompt and the mock output.
+ */
+function makeFileReviewAgent(opts: {
+  name: string;
+  taskType: TaskType;
+  description: string;
+  focus: string;
+  mockFinding: string;
+  mockMissing: string;
+}): WorkflowDefinition {
+  return {
+    name: opts.name,
+    taskType: opts.taskType,
+    description: opts.description,
+    outputType: 'summary',
+    outputSchema: fileReviewSchema,
+    buildUserContext: (input) => renderSources(input.sources),
+    mainContent: (s) => {
+      const lines = [str(s.summary)];
+      const list = (label: string, items: unknown) => {
+        if (Array.isArray(items) && items.length) {
+          lines.push(`\n${label}:`, ...items.map((i) => `- ${String(i)}`));
+        }
+      };
+      list('Findings', s.findings);
+      list('Red flags', s.red_flags);
+      list('Missing items', s.missing_items);
+      return lines.join('\n');
+    },
+    mockOutput: (input) => ({
+      summary: `${opts.focus} review of the provided file context: ${input.primary_text.slice(0, 100) || '(no context)'} (mock).`,
+      findings: [opts.mockFinding],
+      red_flags: [],
+      missing_items: [opts.mockMissing],
+      recommended_next_steps: ['Verify against the actual loan file before relying on this review (mock)'],
+      citations: mockCitations(input),
+      confidence_label: input.sources.length ? 'MEDIUM' : 'LOW',
+      requires_human_review: true,
+      warnings: [],
+    }),
+    assess: (s, input) => {
+      const warnings: string[] = [];
+      let confidence = conf(s.confidence_label);
+      if (!input.sources.length) {
+        warnings.push(
+          `No source documents were provided — this ${opts.focus.toLowerCase()} review is based only on the task description and must be verified against the loan file.`,
+        );
+        confidence = capConfidence(confidence, 'LOW');
+      }
+      warnings.push(
+        'AI file review is advisory only. All underwriting and lending decisions are made by licensed staff.',
+      );
+      return { warnings, confidence };
+    },
+  };
+}
+
+export const incomeReview = makeFileReviewAgent({
+  name: 'income_review',
+  taskType: 'income_review',
+  description: 'Reviews income documentation for completeness, consistency, and red flags (advisory only)',
+  focus: 'Income',
+  mockFinding: 'Base salary on paystub is consistent across the provided periods (mock)',
+  mockMissing: 'Most recent W-2 (mock)',
+});
+
+export const assetReview = makeFileReviewAgent({
+  name: 'asset_review',
+  taskType: 'asset_review',
+  description: 'Reviews asset/bank statements for funds-to-close, large deposits, and sourcing gaps (advisory only)',
+  focus: 'Asset',
+  mockFinding: 'Ending balance covers estimated cash-to-close (mock)',
+  mockMissing: 'Letter of explanation for the large deposit on the statement (mock)',
+});
+
+export const creditReview = makeFileReviewAgent({
+  name: 'credit_review',
+  taskType: 'credit_review',
+  description: 'Reviews credit report context for disputes, inquiries, and undisclosed debts (advisory only)',
+  focus: 'Credit',
+  mockFinding: 'No disputed accounts referenced in the provided context (mock)',
+  mockMissing: 'Inquiry explanation letter for recent credit pulls (mock)',
+});
+
+export const titleInsuranceReview = makeFileReviewAgent({
+  name: 'title_insurance_review',
+  taskType: 'title_insurance_review',
+  description: 'Reviews title commitment / insurance docs for vesting, liens, and coverage gaps (advisory only)',
+  focus: 'Title/Insurance',
+  mockFinding: 'Proposed insured matches the loan amount in the provided context (mock)',
+  mockMissing: 'Updated homeowner insurance declaration page (mock)',
+});
+
 /** Implemented workflows, by name. */
 export const WORKFLOWS: Record<string, WorkflowDefinition> = Object.fromEntries(
-  [conditionResponseDraft, borrowerEmailDraft, documentChecklistBuilder, sopLookupAnswer].map(
-    (w) => [w.name, w],
-  ),
+  [
+    conditionResponseDraft,
+    borrowerEmailDraft,
+    documentChecklistBuilder,
+    sopLookupAnswer,
+    incomeReview,
+    assetReview,
+    creditReview,
+    titleInsuranceReview,
+  ].map((w) => [w.name, w]),
 );
 
-/** Planned agents that have configs but no implementation yet (Phase 2/3). */
+/** Planned agents that have configs but no implementation yet (Phase 3). */
 export const PLANNED_WORKFLOWS = [
-  { workflow_name: 'income_review', task_type: 'income_review', description: 'Income Review Agent (Phase 2)' },
-  { workflow_name: 'asset_review', task_type: 'asset_review', description: 'Asset Review Agent (Phase 2)' },
-  { workflow_name: 'credit_review', task_type: 'credit_review', description: 'Credit Review Agent (Phase 2)' },
-  { workflow_name: 'title_insurance_review', task_type: 'title_insurance_review', description: 'Title/Insurance Agent (Phase 2)' },
   { workflow_name: 'website_qa', task_type: 'website_qa', description: 'Website Mortgage Q&A Agent (Phase 3)' },
 ] as const;
 
