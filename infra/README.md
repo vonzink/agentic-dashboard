@@ -50,7 +50,7 @@ VITE_ENV=dev
 VITE_AUTH_MODE=cognito
 VITE_COGNITO_DOMAIN=https://$(terraform output -raw cognito_hosted_domain).auth.$(terraform output -raw cognito_user_pool_id | cut -d_ -f1).amazoncognito.com
 VITE_COGNITO_CLIENT_ID=$(terraform output -raw cognito_client_id)
-VITE_COGNITO_REDIRECT_URI=https://$(terraform output -raw cloudfront_domain)
+VITE_COGNITO_REDIRECT_URI=$(terraform output -raw app_url)
 EOF
 (cd apps/web && npm run build)
 aws s3 sync apps/web/dist "s3://$(terraform output -raw spa_bucket)" --delete
@@ -64,8 +64,10 @@ aws cognito-idp admin-add-user-to-group --user-pool-id "$(terraform output -raw 
   --username someone@msfg.com --group-name operator
 ```
 
-Add the CloudFront URL to `cognito_callback_urls`/`cognito_logout_urls` in
-terraform.tfvars and re-apply once you know it.
+With the custom domain enabled, `https://agentic.zvzsolutions.com` is
+already in `cognito_callback_urls` via terraform.tfvars — nothing to add
+after the fact. (Without a domain, add the `cloudfront_domain` output to
+the callback/logout lists and re-apply.)
 
 **Custom domain (default: zvzsolutions.com).** With `route53_zone_name`
 set, terraform creates ACM certs (DNS-validated automatically), A-aliases
