@@ -19,3 +19,9 @@ coverage/
 
 # local upload storage (dev)
 .data/
+
+# terraform
+infra/terraform/.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars

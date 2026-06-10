@@ -3,7 +3,7 @@ import { useCreatePrompt, usePrompts, useSetPromptActive, useWorkflows } from '.
 import type { PromptTemplate } from '../api/types';
 import { Badge } from '../components/Badge';
 import { EmptyState, ErrorState, Loading } from '../components/States';
-import { loadDevUser } from '../lib/devUser';
+import { currentIdentity } from '../lib/identity';
 import { fmtDate, titleCase } from '../lib/format';
 
 function PromptGroup({ name, versions }: { name: string; versions: PromptTemplate[] }) {
@@ -113,7 +113,7 @@ function NewPromptVersionForm({ existing }: { existing: PromptTemplate[] }) {
 }
 
 export function AdminPage() {
-  const role = loadDevUser().role;
+  const role = currentIdentity().role;
   const prompts = usePrompts();
   const workflows = useWorkflows();
   const [tab, setTab] = useState<'prompts' | 'workflows'>('prompts');

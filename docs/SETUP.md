@@ -119,3 +119,5 @@ curl -s :4000/api/ai/tasks/$TASK/audit -H 'x-user-role: viewer' | jq '.items[].e
 | `INTEGRATION_EXECUTION_ENABLED` | `false` | master switch; false = propose-only |
 | `VITE_ENV` | `local` | web env badge |
 | `VITE_USE_MOCKS` | `false` | web mock data layer |
+| `VITE_AUTH_MODE` | `dev` | web login: `dev` switcher or `cognito` hosted-UI PKCE |
+| `VITE_COGNITO_DOMAIN/CLIENT_ID/REDIRECT_URI/GROUP_PREFIX` | _(unset)_ | required for web `cognito` mode |

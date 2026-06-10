@@ -1,0 +1,28 @@
+# Copy to terraform.tfvars and adjust. No secrets belong in this file —
+# the Anthropic key is set directly in Secrets Manager after apply.
+
+aws_region  = "us-east-1"
+environment = "dev"
+
+# Lock the dashboard down to office/VPN ranges before real use:
+# allowed_ingress_cidrs = ["203.0.113.0/24"]
+
+# TLS: issue a cert in ACM for your internal hostname, then:
+# acm_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/..."
+
+cognito_domain_prefix = "msfg-agentic-dev" # must be globally unique
+cognito_callback_urls = [
+  "http://localhost:5173",
+  # "https://<cloudfront_domain output>",
+]
+cognito_logout_urls = [
+  "http://localhost:5173",
+  # "https://<cloudfront_domain output>",
+]
+
+model_provider = "mock" # switch to "anthropic" after setting the key secret
+
+# Prod hardening:
+# environment              = "prod"
+# db_multi_az              = true
+# api_desired_count        = 2

@@ -12,7 +12,7 @@ import type { OutputDetail, ReviewStatus } from '../api/types';
 import { Badge } from '../components/Badge';
 import { OutputCard } from '../components/OutputCard';
 import { EmptyState, ErrorState, Loading } from '../components/States';
-import { loadDevUser } from '../lib/devUser';
+import { currentIdentity } from '../lib/identity';
 import { fmtDate, titleCase } from '../lib/format';
 
 /** Best initial value for the editable final response. */
@@ -33,7 +33,7 @@ function ReviewPane({ outputId, onDone }: { outputId: string; onDone: () => void
   const [finalText, setFinalText] = useState('');
   const [notes, setNotes] = useState('');
   const [toast, setToast] = useState('');
-  const role = loadDevUser().role;
+  const role = currentIdentity().role;
   const canReview = role === 'reviewer' || role === 'admin';
 
   useEffect(() => {

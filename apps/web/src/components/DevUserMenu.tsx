@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Role } from '../api/types';
 import { loadDevUser, ROLES, saveDevUser } from '../lib/devUser';
+import { AUTH_MODE, currentIdentity, logout } from '../lib/identity';
 
 /**
  * Dev-only identity switcher. AUTH_MODE=dev trusts these values via
@@ -9,6 +10,20 @@ import { loadDevUser, ROLES, saveDevUser } from '../lib/devUser';
 export function DevUserMenu() {
   const [open, setOpen] = useState(false);
   const [user, setUser] = useState(loadDevUser());
+
+  if (AUTH_MODE === 'cognito') {
+    const identity = currentIdentity();
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className="muted">
+          {identity.email || 'signed in'} · {identity.role}
+        </span>
+        <button className="btn sm ghost" onClick={() => logout()}>
+          Sign out
+        </button>
+      </div>
+    );
+  }
 
   const update = (patch: Partial<typeof user>) => {
     const next = { ...user, ...patch };

@@ -18,7 +18,7 @@ import { AuditTimeline } from '../components/AuditTimeline';
 import { Badge } from '../components/Badge';
 import { copyFinalText, OutputCard } from '../components/OutputCard';
 import { EmptyState, ErrorState, Loading } from '../components/States';
-import { loadDevUser } from '../lib/devUser';
+import { currentIdentity } from '../lib/identity';
 import { fmtCost, fmtDate, titleCase } from '../lib/format';
 
 const INPUT_TYPES: InputType[] = [
@@ -145,7 +145,7 @@ function RunDialog({ task }: { task: TaskDetail }) {
 }
 
 function OutputActions({ output, finalContent }: { output: AiOutput; finalContent?: string | null }) {
-  const role = loadDevUser().role;
+  const role = currentIdentity().role;
   const canReview = role === 'reviewer' || role === 'admin';
   const approve = useApproveOutput();
   const reject = useRejectOutput();

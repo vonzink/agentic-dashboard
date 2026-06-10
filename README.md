@@ -18,8 +18,8 @@ disabled by default. See [docs/AI_COMPLIANCE_GUARDRAILS.md](docs/AI_COMPLIANCE_G
 | Web UI | React 18 + TypeScript + Vite (`apps/web`) |
 | API | Node 22 + TypeScript + Express (`apps/api`) |
 | AI workflows | LangGraph.js, in-process, draft-only; mock provider for dev, Anthropic for real runs |
-| Data | Postgres (RDS in prod; in-memory mode for DB-less dev), S3 for documents (Phase 2) |
-| Auth | Dev-header identity locally; Cognito (Phase 2), roles viewer/operator/reviewer/admin |
+| Data | Postgres (RDS in prod; in-memory mode for DB-less dev), S3 for documents |
+| Auth | Cognito (JWT verification + hosted-UI PKCE login) or dev-header identity locally; roles viewer/operator/reviewer/admin |
 
 ## Quickstart
 
@@ -46,3 +46,4 @@ Full instructions (Postgres, real model provider, curl walkthrough):
 | [docs/AGENTIC_DASHBOARD_INTEGRATIONS_ROADMAP.md](docs/AGENTIC_DASHBOARD_INTEGRATIONS_ROADMAP.md) | Monday/LendingPad/GHL/email roadmap |
 | [docs/AGENTIC_DASHBOARD_CODEBASE_MAP.md](docs/AGENTIC_DASHBOARD_CODEBASE_MAP.md) | Component map, protected areas |
 | [docs/SETUP.md](docs/SETUP.md) | Local dev setup + env vars |
+| [infra/README.md](infra/README.md) + [infra/terraform/](infra/terraform/) | AWS bring-up (terraform-validated; not yet applied) |

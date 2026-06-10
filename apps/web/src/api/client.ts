@@ -1,4 +1,4 @@
-import { loadDevUser } from '../lib/devUser';
+import { AUTH_MODE, authHeaders, clearTokens } from '../lib/identity';
 import type { ApiErrorBody } from './types';
 
 export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true';
@@ -47,18 +47,13 @@ export function buildQuery(
 }
 
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const user = loadDevUser();
   const url = `/api/ai${path}${buildQuery(options.query)}`;
 
   let response: Response;
   try {
     response = await fetchImpl(url, {
       method: options.method ?? 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-email': user.email,
-        'x-user-role': user.role,
-      },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     });
   } catch {
@@ -66,6 +61,8 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   }
 
   if (!response.ok) {
+    // Cognito session expired/revoked: drop tokens so AuthGate re-prompts.
+    if (response.status === 401 && AUTH_MODE === 'cognito') clearTokens();
     let body: ApiErrorBody | null = null;
     try {
       body = (await response.json()) as ApiErrorBody;
@@ -104,7 +101,6 @@ export async function apiUpload<T>(
   file: File,
   fields: Record<string, string> = {},
 ): Promise<T> {
-  const user = loadDevUser();
   const form = new FormData();
   form.append('file', file);
   for (const [k, v] of Object.entries(fields)) form.append(k, v);
@@ -113,7 +109,7 @@ export async function apiUpload<T>(
   try {
     response = await fetchImpl(`/api/ai${path}`, {
       method: 'POST',
-      headers: { 'x-user-email': user.email, 'x-user-role': user.role },
+      headers: await authHeaders(),
       body: form as unknown as BodyInit,
     });
   } catch {
