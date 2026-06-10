@@ -226,12 +226,16 @@ CREATE TABLE ai_source_chunks (
   content        text NOT NULL,
   page_number    integer,
   section_label  text,
-  embedding_id   text,                          -- pgvector row / external id (Phase 2)
+  embedding_id   text,                          -- reserved external-id pointer (unused)
+  embedding_json jsonb,                         -- retrieval vector (migration 0002)
+  embedding_model text,                         -- which embedder wrote the vector
   created_at     timestamptz NOT NULL DEFAULT now(),
   UNIQUE (document_id, chunk_index)
 );
 
 CREATE INDEX idx_ai_source_chunks_document ON ai_source_chunks (document_id);
+CREATE INDEX idx_ai_source_chunks_embedding_model
+  ON ai_source_chunks (embedding_model) WHERE embedding_json IS NOT NULL;
 
 -- ---------------------------------------------------------------------------
 -- 9. ai_citations — links an output's claims back to sources

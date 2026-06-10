@@ -17,6 +17,7 @@ import type {
 import type {
   ActionFilter,
   AuditFilter,
+  EmbeddedChunk,
   NewAiOutput,
   NewApproval,
   NewAuditEvent,
@@ -65,6 +66,7 @@ export class MemoryStore implements Store {
   private auditSeq = 0;
   private documentsById = new Map<string, SourceDocument>();
   private chunksById = new Map<string, SourceChunk>();
+  private embeddingsByChunk = new Map<string, { model: string; embedding: number[] }>();
   private citationsById = new Map<string, Citation>();
   private promptsById = new Map<string, PromptTemplate>();
   private configsByName = new Map<string, WorkflowConfig>();
@@ -221,6 +223,13 @@ export class MemoryStore implements Store {
       return row;
     },
     get: async (id: string) => this.documentsById.get(id) ?? null,
+    update: async (id: string, patch: Partial<SourceDocument>) => {
+      const existing = this.documentsById.get(id);
+      if (!existing) return null;
+      const updated = { ...existing, ...patch, id };
+      this.documentsById.set(id, updated);
+      return updated;
+    },
     list: async (filter: Page & { document_type?: string }) => {
       const rows = [...this.documentsById.values()]
         .filter((d) => !filter.document_type || d.document_type === filter.document_type)
@@ -246,6 +255,26 @@ export class MemoryStore implements Store {
         .filter((c) => c.document_id === documentId)
         .map((c) => c.chunk_index);
       return indexes.length ? Math.max(...indexes) + 1 : 0;
+    },
+    setEmbedding: async (chunkId: string, model: string, embedding: number[]) => {
+      this.embeddingsByChunk.set(chunkId, { model, embedding });
+    },
+    listEmbedded: async (model: string): Promise<EmbeddedChunk[]> => {
+      const out: EmbeddedChunk[] = [];
+      for (const [chunkId, e] of this.embeddingsByChunk) {
+        if (e.model !== model) continue;
+        const c = this.chunksById.get(chunkId);
+        if (!c) continue;
+        out.push({
+          chunk_id: c.id,
+          document_id: c.document_id,
+          content: c.content,
+          section_label: c.section_label,
+          page_number: c.page_number,
+          embedding: e.embedding,
+        });
+      }
+      return out;
     },
   };
 

@@ -101,6 +101,7 @@ function RunDialog({ task }: { task: TaskDetail }) {
   const implemented = workflows.data?.items.filter((w) => w.implemented && w.is_active) ?? [];
   const [workflow, setWorkflow] = useState('');
   const [tone, setTone] = useState('');
+  const [retrieve, setRetrieve] = useState(task.task_type === 'sop_lookup');
   const selected = workflow || implemented.find((w) => w.task_type === task.task_type)?.workflow_name || '';
 
   return (
@@ -125,11 +126,18 @@ function RunDialog({ task }: { task: TaskDetail }) {
         <button
           className="btn primary"
           disabled={!selected || run.isPending}
-          onClick={() => run.mutate({ workflow_name: selected, options: tone ? { tone } : {} })}
+          onClick={() =>
+            run.mutate({ workflow_name: selected, options: { ...(tone ? { tone } : {}), retrieve } })
+          }
         >
           {run.isPending ? 'Running…' : 'Run workflow'}
         </button>
       </div>
+      <label style={{ display: 'block', marginTop: 4 }}>
+        <input type="checkbox" checked={retrieve} onChange={(e) => setRetrieve(e.target.checked)} />{' '}
+        Auto-retrieve matching sources from the document library (citations stay traceable to each
+        retrieved chunk)
+      </label>
       {run.isPending && <p className="muted">Drafting… the output will require human review.</p>}
       {run.isError && <ErrorState error={run.error} />}
     </div>

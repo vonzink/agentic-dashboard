@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiUpload } from '../api/client';
-import { useAddChunk, useCreateDocument, useDocument, useDocuments } from '../api/hooks';
+import { useAddChunk, useChunkSearch, useCreateDocument, useDocument, useDocuments } from '../api/hooks';
 import type { Classification, DocumentDetail, DocumentType } from '../api/types';
 import { Badge } from '../components/Badge';
 import { Pager } from '../components/Pager';
@@ -12,6 +12,45 @@ const DOC_TYPES: DocumentType[] = [
   'sop', 'guideline', 'condition_sheet', 'paystub', 'bank_statement', 'tax_return',
   'credit_report', 'title_doc', 'insurance_doc', 'correspondence', 'manual_snippet', 'other',
 ];
+
+function SearchPanel({ onSelect }: { onSelect: (documentId: string) => void }) {
+  const [q, setQ] = useState('');
+  const search = useChunkSearch(q);
+  return (
+    <div className="panel">
+      <h2>Search the library</h2>
+      <input
+        type="text"
+        placeholder="e.g. reserves required for second homes…"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+      />
+      {search.isFetching && <Loading />}
+      {search.isError && <ErrorState error={search.error} />}
+      {search.data && q.trim().length >= 2 && (
+        search.data.items.length === 0 ? (
+          <p className="muted">No matching chunks. Upload SOPs/guidelines to make them searchable.</p>
+        ) : (
+          search.data.items.map((hit) => (
+            <div
+              className="citation"
+              key={hit.chunk_id}
+              style={{ cursor: 'pointer' }}
+              onClick={() => onSelect(hit.document_id)}
+              title="Open document"
+            >
+              <span className="label">
+                {hit.source_label}
+                {hit.page_number ? `, p.${hit.page_number}` : ''} · score {hit.score}
+              </span>
+              <div>{hit.content.slice(0, 240)}{hit.content.length > 240 ? '…' : ''}</div>
+            </div>
+          ))
+        )
+      )}
+    </div>
+  );
+}
 
 function UploadForm({ onCreated }: { onCreated: (id: string) => void }) {
   const qc = useQueryClient();
@@ -221,6 +260,7 @@ export function DocumentsPage() {
 
   return (
     <div>
+      <SearchPanel onSelect={setSelected} />
       <UploadForm onCreated={setSelected} />
       <AddDocumentForm onCreated={setSelected} />
 

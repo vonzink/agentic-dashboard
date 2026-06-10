@@ -70,8 +70,14 @@ export const createRunBody = z.object({
       occupancy: z.string().max(60).optional(),
       special_scenario: z.string().max(500).optional(),
       source_chunk_ids: z.array(z.uuid()).max(20).optional(),
+      retrieve: z.boolean().optional(),
     })
     .default({}),
+});
+
+export const searchQuery = z.object({
+  q: z.string().min(2).max(500),
+  k: z.coerce.number().int().min(1).max(20).default(5),
 });
 
 export const approveBody = z.object({

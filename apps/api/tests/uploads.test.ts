@@ -12,9 +12,14 @@ import { as } from './helpers';
 class FakeStorage implements BlobStorage {
   readonly kind = 'local';
   puts: { key: string; size: number; contentType: string }[] = [];
+  private blobs = new Map<string, Buffer>();
   async put(key: string, body: Buffer, contentType: string): Promise<StoredBlob> {
     this.puts.push({ key, size: body.length, contentType });
+    this.blobs.set(key, body);
     return { bucket: null, key };
+  }
+  async get(key: string): Promise<Buffer | null> {
+    return this.blobs.get(key) ?? null;
   }
 }
 

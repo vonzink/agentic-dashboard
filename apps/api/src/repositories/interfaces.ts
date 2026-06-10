@@ -62,6 +62,16 @@ export type NewPromptTemplate = Omit<PromptTemplate, 'id' | 'created_at'>;
 export type NewWorkflowConfig = Omit<WorkflowConfig, 'id' | 'created_at' | 'updated_at'>;
 export type NewIntegrationAction = Omit<IntegrationAction, 'id' | 'created_at' | 'completed_at'>;
 
+/** A chunk + its retrieval vector (kept off the SourceChunk API type). */
+export interface EmbeddedChunk {
+  chunk_id: string;
+  document_id: string;
+  content: string;
+  section_label: string | null;
+  page_number: number | null;
+  embedding: number[];
+}
+
 /** Output joined with task context for the approval-center list. */
 export type OutputListItem = AiOutput & {
   task_id: string;
@@ -131,6 +141,10 @@ export interface Store {
   documents: {
     create(d: NewSourceDocument): Promise<SourceDocument>;
     get(id: string): Promise<SourceDocument | null>;
+    update(
+      id: string,
+      patch: Partial<Pick<SourceDocument, 'text_extraction_status'>>,
+    ): Promise<SourceDocument | null>;
     list(filter: Page & { document_type?: string }): Promise<Paginated<SourceDocument>>;
   };
   chunks: {
@@ -138,6 +152,12 @@ export interface Store {
     listByDocument(documentId: string): Promise<SourceChunk[]>;
     getMany(ids: string[]): Promise<SourceChunk[]>;
     nextIndex(documentId: string): Promise<number>;
+    /** Stores the retrieval vector for a chunk (per embedding model). */
+    setEmbedding(chunkId: string, model: string, embedding: number[]): Promise<void>;
+    /** All chunks embedded with `model` — the retrieval candidate set.
+     * Embeddings are deliberately NOT on the SourceChunk domain type so
+     * API payloads stay small. */
+    listEmbedded(model: string): Promise<EmbeddedChunk[]>;
   };
   citations: {
     createMany(rows: NewCitation[]): Promise<Citation[]>;

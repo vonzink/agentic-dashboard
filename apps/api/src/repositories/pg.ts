@@ -17,6 +17,7 @@ import type {
 import type {
   ActionFilter,
   AuditFilter,
+  EmbeddedChunk,
   NewAiOutput,
   NewApproval,
   NewAuditEvent,
@@ -58,7 +59,11 @@ const mapOutput = (r: any): AiOutput => ({ ...r, created_at: iso(r.created_at)! 
 const mapApproval = (r: any): Approval => ({ ...r, reviewed_at: iso(r.reviewed_at)! });
 const mapAudit = (r: any): AuditEvent => ({ ...r, created_at: iso(r.created_at)! });
 const mapDocument = (r: any): SourceDocument => ({ ...r, created_at: iso(r.created_at)! });
-const mapChunk = (r: any): SourceChunk => ({ ...r, created_at: iso(r.created_at)! });
+// embedding columns stay out of API payloads (see chunks.listEmbedded)
+const mapChunk = ({ embedding_json: _e, embedding_model: _m, ...r }: any): SourceChunk => ({
+  ...r,
+  created_at: iso(r.created_at)!,
+});
 const mapCitation = (r: any): Citation => ({ ...r, created_at: iso(r.created_at)! });
 const mapPrompt = (r: any): PromptTemplate => ({ ...r, created_at: iso(r.created_at)! });
 const mapConfig = (r: any): WorkflowConfig => ({
@@ -386,6 +391,15 @@ export class PgStore implements Store {
       const { rows } = await this.db.query('SELECT * FROM ai_source_documents WHERE id = $1', [id]);
       return rows[0] ? mapDocument(rows[0]) : null;
     },
+    update: async (id: string, patch: Record<string, unknown>) => {
+      if (!Object.keys(patch).length) return this.documents.get(id);
+      const { sets, values, next } = setClause(patch);
+      const { rows } = await this.db.query(
+        `UPDATE ai_source_documents SET ${sets} WHERE id = $${next} RETURNING *`,
+        [...values, id],
+      );
+      return rows[0] ? mapDocument(rows[0]) : null;
+    },
     list: async (filter: Page & { document_type?: string }) => {
       const params: unknown[] = [];
       let whereSql = '';
@@ -436,6 +450,28 @@ export class PgStore implements Store {
         [documentId],
       );
       return rows[0].next as number;
+    },
+    setEmbedding: async (chunkId: string, model: string, embedding: number[]) => {
+      await this.db.query(
+        'UPDATE ai_source_chunks SET embedding_json = $1, embedding_model = $2 WHERE id = $3',
+        [JSON.stringify(embedding), model, chunkId],
+      );
+    },
+    listEmbedded: async (model: string): Promise<EmbeddedChunk[]> => {
+      const { rows } = await this.db.query(
+        `SELECT id, document_id, content, section_label, page_number, embedding_json
+           FROM ai_source_chunks
+          WHERE embedding_model = $1 AND embedding_json IS NOT NULL`,
+        [model],
+      );
+      return rows.map((r) => ({
+        chunk_id: r.id,
+        document_id: r.document_id,
+        content: r.content,
+        section_label: r.section_label,
+        page_number: r.page_number,
+        embedding: r.embedding_json as number[],
+      }));
     },
   };
 

@@ -70,6 +70,25 @@ website_qa (Phase 3).
 4. Add a test in `apps/api/tests/` covering its output schema and any
    `assess` rules.
 
+## Retrieval (RAG)
+
+Runs accept `options.retrieve: true` (the UI defaults it on for SOP
+lookups): the run service embeds the task's primary text, ranks all
+embedded library chunks by cosine similarity, and merges the top 5 into
+the workflow's sources before prompting. Provenance is preserved — the
+run's `input_snapshot_json.retrieval` records every retrieved chunk id and
+score, and citations resolve back to those chunks. `GET /api/ai/search?q=`
+exposes the same ranking for the UI.
+
+Embeddings (`src/services/embeddings.ts`) default to `local-hash-v1`, a
+deterministic lexical hashing embedder — no API key, hermetic CI, honest
+about being a lexical (not semantic) proxy. Swap in a real embedding
+service by implementing `EmbeddingProvider`; vectors are stored per-model
+(`ai_source_chunks.embedding_model`), so reindexing is just re-embedding.
+Similarity is computed in the app over jsonb vectors; when the corpus
+outgrows that (≳50k chunks), enable pgvector on RDS and push ranking into
+SQL behind the same `RetrievalService` interface.
+
 ## Model/provider abstraction
 
 `src/workflows/providers.ts` is the only file allowed to import an LLM SDK.

@@ -19,6 +19,7 @@ import {
   listPromptsQuery,
   listTasksQuery,
   rejectBody,
+  searchQuery,
   updatePromptBody,
   updateTaskBody,
   uploadDocumentFields,
@@ -206,6 +207,16 @@ export function buildRouter(s: Services): Router {
   r.post('/documents/:id/chunks', requireRole('operator'), async (req, res) => {
     const body = createChunkBody.parse(req.body);
     res.status(201).json(await s.documents.addChunk(currentUser(req), param(req, 'id'), body));
+  });
+
+  r.post('/documents/:id/extract', requireRole('operator'), async (req, res) => {
+    res.json(await s.documents.reextract(currentUser(req), param(req, 'id')));
+  });
+
+  // ----- retrieval ---------------------------------------------------------------
+  r.get('/search', requireRole('viewer'), async (req, res) => {
+    const { q, k } = searchQuery.parse(req.query);
+    res.json({ items: await s.retrieval.search(q, k), model: s.embedder.model });
   });
 
   // ----- prompts (admin) ----------------------------------------------------------

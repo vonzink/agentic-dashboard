@@ -6,7 +6,9 @@ import { ActionService } from './actions';
 import { ApprovalService } from './approvals';
 import { AuditService } from './audit';
 import { DocumentService } from './documents';
+import { LocalHashEmbedder, type EmbeddingProvider } from './embeddings';
 import { PromptService } from './prompts';
+import { RetrievalService } from './retrieval';
 import { RunService } from './runs';
 import { createStorage, type BlobStorage } from './storage';
 import { TaskService } from './tasks';
@@ -21,6 +23,8 @@ export interface Services {
   actions: ActionService;
   provider: ModelProvider;
   storage: BlobStorage;
+  embedder: EmbeddingProvider;
+  retrieval: RetrievalService;
   store: Store;
   config: AppConfig;
 }
@@ -29,14 +33,16 @@ export function buildServices(store: Store, config: AppConfig, storage?: BlobSto
   const audit = new AuditService(store);
   const tasks = new TaskService(store, audit);
   const blobStorage = storage ?? createStorage(config);
-  const documents = new DocumentService(store, audit, blobStorage);
+  const embedder = new LocalHashEmbedder();
+  const retrieval = new RetrievalService(store, embedder);
+  const documents = new DocumentService(store, audit, blobStorage, embedder);
   const prompts = new PromptService(store, audit);
   const provider = createProvider(config, mockOutputFor);
-  const runs = new RunService(store, audit, tasks, prompts, provider, config);
+  const runs = new RunService(store, audit, tasks, prompts, provider, config, retrieval);
   const approvals = new ApprovalService(store, audit, config);
   const actions = new ActionService(store, audit, config);
   return {
     audit, tasks, documents, prompts, runs, approvals, actions,
-    provider, storage: blobStorage, store, config,
+    provider, storage: blobStorage, embedder, retrieval, store, config,
   };
 }

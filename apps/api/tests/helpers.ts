@@ -5,10 +5,25 @@ import { buildApp } from '../src/app';
 import { loadConfig, type AppConfig } from '../src/config';
 import { MemoryStore } from '../src/repositories/memory';
 import { seedDefaults } from '../src/services/seed';
+import type { BlobStorage, StoredBlob } from '../src/services/storage';
+
+/** In-memory blob storage so tests never touch disk or S3. */
+export class MemoryBlobStorage implements BlobStorage {
+  readonly kind = 'local';
+  private blobs = new Map<string, Buffer>();
+  async put(key: string, body: Buffer): Promise<StoredBlob> {
+    this.blobs.set(key, body);
+    return { bucket: null, key };
+  }
+  async get(key: string): Promise<Buffer | null> {
+    return this.blobs.get(key) ?? null;
+  }
+}
 
 /**
- * Test harness: in-memory store + mock model provider + dev auth.
- * All fixture data is synthetic — never borrower production data.
+ * Test harness: in-memory store + mock model provider + dev auth +
+ * in-memory blob storage. All fixture data is synthetic — never borrower
+ * production data.
  */
 export async function buildTestApp(overrides: Partial<AppConfig> = {}) {
   const config = loadConfig({
@@ -23,8 +38,9 @@ export async function buildTestApp(overrides: Partial<AppConfig> = {}) {
   });
   const store = new MemoryStore();
   await seedDefaults(store);
-  const { app, services } = buildApp(store, config);
-  return { app, store, services, config };
+  const storage = new MemoryBlobStorage();
+  const { app, services } = buildApp(store, config, { storage });
+  return { app, store, services, config, storage };
 }
 
 export const as = {

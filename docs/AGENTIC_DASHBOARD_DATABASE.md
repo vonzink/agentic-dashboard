@@ -83,8 +83,10 @@ Hot paths are: task queue filtering (`status`, `task_type`, `assigned_to`,
 `created_at DESC`), approval queue (`ai_outputs.review_status`), per-task
 drill-down (FK indexes on every child table), and audit search
 (`event_type`, `task_id`, `created_at DESC`). All covered by the indexes in
-the DDL. pgvector indexes for `ai_source_chunks.embedding_id` arrive in
-Phase 2 with RAG.
+the DDL. Retrieval vectors live in `ai_source_chunks.embedding_json`
+(jsonb, per-model via `embedding_model`, migration 0002) with similarity
+computed in the app; a pgvector column + index is the documented upgrade
+path once the corpus demands SQL-side ranking.
 
 ## Migration approach
 

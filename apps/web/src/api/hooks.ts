@@ -16,6 +16,7 @@ import type {
   PromptTemplate,
   ReviewQueueItem,
   RunResponse,
+  SearchHit,
   SourceChunk,
   SourceDocument,
   Task,
@@ -123,7 +124,7 @@ export function useRunWorkflow(taskId: string) {
   return useMutation({
     mutationFn: (body: {
       workflow_name: string;
-      options?: { tone?: string; loan_type?: string; lender?: string; source_chunk_ids?: string[] };
+      options?: { tone?: string; loan_type?: string; lender?: string; source_chunk_ids?: string[]; retrieve?: boolean };
     }) => apiFetch<RunResponse>(`/tasks/${taskId}/runs`, { method: 'POST', body }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['task', taskId] });
@@ -315,5 +316,15 @@ export function useExecuteAction() {
       qc.invalidateQueries({ queryKey: ['task'] });
       qc.invalidateQueries({ queryKey: ['actions'] });
     },
+  });
+}
+
+// ---------- retrieval ----------
+
+export function useChunkSearch(q: string, k = 5) {
+  return useQuery({
+    queryKey: ['search', q, k],
+    queryFn: () => apiFetch<{ items: SearchHit[]; model: string }>('/search', { query: { q, k } }),
+    enabled: q.trim().length >= 2,
   });
 }

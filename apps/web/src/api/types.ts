@@ -325,3 +325,13 @@ export interface ApprovalResponse {
   approval: Approval;
   output: AiOutput;
 }
+
+/** GET /search result item (retrieval over embedded chunks). */
+export interface SearchHit {
+  chunk_id: string;
+  document_id: string;
+  source_label: string;
+  content: string;
+  page_number: number | null;
+  score: number;
+}

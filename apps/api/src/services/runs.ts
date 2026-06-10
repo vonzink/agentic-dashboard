@@ -8,6 +8,7 @@ import { renderPrompt, runWorkflow, WorkflowOutputError } from '../workflows/run
 import type { SourceSnippet, WorkflowInput } from '../workflows/types';
 import type { AuditService } from './audit';
 import type { PromptService } from './prompts';
+import type { RetrievalService } from './retrieval';
 import type { TaskService } from './tasks';
 
 export interface RunOptions {
@@ -19,6 +20,8 @@ export interface RunOptions {
   occupancy?: string;
   special_scenario?: string;
   source_chunk_ids?: string[];
+  /** Auto-retrieve top-k similar chunks from the document library. */
+  retrieve?: boolean;
 }
 
 export class RunService {
@@ -29,6 +32,7 @@ export class RunService {
     private prompts: PromptService,
     private provider: ModelProvider,
     private config: AppConfig,
+    private retrieval: RetrievalService,
   ) {}
 
   /**
@@ -51,6 +55,29 @@ export class RunService {
     }
 
     const input = await this.assembleInput(taskId, task.title, def.taskType, options);
+
+    // RAG: merge top-k retrieved chunks into the sources. Retrieved
+    // provenance lands in the run snapshot (chunk ids + scores), so every
+    // citation remains traceable to what was retrieved and why.
+    let retrievalMeta: Record<string, unknown> | null = null;
+    if (options.retrieve) {
+      const hits = await this.retrieval.search(input.primary_text, 5);
+      for (const hit of hits) {
+        if (input.sources.some((s) => s.chunk_id === hit.chunk_id)) continue;
+        input.sources.push({
+          document_id: hit.document_id,
+          chunk_id: hit.chunk_id,
+          source_label: hit.source_label,
+          content: hit.content,
+          page_number: hit.page_number,
+        });
+      }
+      retrievalMeta = {
+        k: 5,
+        hits: hits.map((h) => ({ chunk_id: h.chunk_id, document_id: h.document_id, score: h.score })),
+      };
+    }
+
     const promptTemplate = await this.prompts.activeFor(def.name);
     const prompt = renderPrompt(promptTemplate, input);
 
@@ -70,7 +97,7 @@ export class RunService {
       token_output_count: null,
       estimated_cost: null,
       // Exact context the model saw — sources included — for later audit.
-      input_snapshot_json: { input, options, prompt_version: prompt.version },
+      input_snapshot_json: { input, options, prompt_version: prompt.version, retrieval: retrievalMeta },
     });
     await this.audit.record('run.requested', {
       taskId,

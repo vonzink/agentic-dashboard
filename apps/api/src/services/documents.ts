@@ -5,6 +5,7 @@ import type { Page, Store } from '../repositories/interfaces';
 import type { AuthUser, SourceChunk, SourceDocument } from '../types/domain';
 import type { Classification, DocumentType } from '../types/statuses';
 import type { AuditService } from './audit';
+import type { EmbeddingProvider } from './embeddings';
 import { chunkText, extractText } from './extraction';
 import type { BlobStorage } from './storage';
 
@@ -20,7 +21,44 @@ export class DocumentService {
     private store: Store,
     private audit: AuditService,
     private storage: BlobStorage,
+    private embedder: EmbeddingProvider,
   ) {}
+
+  /** Embeds chunks so retrieval can find them; failures never block the
+   * write path (the chunk simply stays unembedded/unsearchable). */
+  private async embedChunks(chunks: SourceChunk[]): Promise<void> {
+    if (!chunks.length) return;
+    try {
+      const vectors = await this.embedder.embed(chunks.map((c) => c.content));
+      await Promise.all(
+        chunks.map((c, i) =>
+          this.store.chunks.setEmbedding(c.id, this.embedder.model, vectors[i]!),
+        ),
+      );
+    } catch (err) {
+      console.error('[embeddings] failed to embed chunks:', err);
+    }
+  }
+
+  /** Creates + embeds the chunks for a block of extracted text. */
+  private async createChunks(documentId: string, text: string): Promise<SourceChunk[]> {
+    const startIndex = await this.store.chunks.nextIndex(documentId);
+    const chunks: SourceChunk[] = [];
+    for (const [offset, content] of chunkText(text).entries()) {
+      chunks.push(
+        await this.store.chunks.create({
+          document_id: documentId,
+          chunk_index: startIndex + offset,
+          content,
+          page_number: null,
+          section_label: null,
+          embedding_id: null,
+        }),
+      );
+    }
+    await this.embedChunks(chunks);
+    return chunks;
+  }
 
   /**
    * Stores an uploaded file (S3 in AWS, local disk in dev), extracts text
@@ -37,7 +75,7 @@ export class DocumentService {
     const key = `documents/${randomUUID()}/${filename}`;
     const stored = await this.storage.put(key, file.buffer, file.mimetype);
 
-    const text = extractText(file.buffer, file.mimetype, filename);
+    const text = await extractText(file.buffer, file.mimetype, filename);
     const doc = await this.store.documents.create({
       filename,
       file_type: file.mimetype || null,
@@ -50,21 +88,7 @@ export class DocumentService {
       metadata_json: { storage: this.storage.kind, size_bytes: file.size },
     });
 
-    const chunks: SourceChunk[] = [];
-    if (text) {
-      for (const [index, content] of chunkText(text).entries()) {
-        chunks.push(
-          await this.store.chunks.create({
-            document_id: doc.id,
-            chunk_index: index,
-            content,
-            page_number: null,
-            section_label: null,
-            embedding_id: null,
-          }),
-        );
-      }
-    }
+    const chunks = text ? await this.createChunks(doc.id, text) : [];
 
     await this.audit.record('document.uploaded', {
       actor: actor.email,
@@ -113,7 +137,7 @@ export class DocumentService {
       metadata_json: body.metadata_json,
     });
     if (body.content) {
-      await this.store.chunks.create({
+      const chunk = await this.store.chunks.create({
         document_id: doc.id,
         chunk_index: 0,
         content: body.content,
@@ -121,6 +145,7 @@ export class DocumentService {
         section_label: null,
         embedding_id: null,
       });
+      await this.embedChunks([chunk]);
     }
     await this.audit.record('document.created', {
       actor: actor.email,
@@ -139,6 +164,47 @@ export class DocumentService {
     const doc = await this.store.documents.get(id);
     if (!doc) throw ApiError.notFound('Document');
     return doc;
+  }
+
+  /**
+   * Re-runs text extraction for a stored document whose extraction is
+   * still pending/failed (e.g. PDFs uploaded before PDF support, or after
+   * an extractor upgrade). Honest semantics preserved: if no text can be
+   * extracted, the document STAYS pending — nothing is fabricated.
+   */
+  async reextract(actor: AuthUser, id: string) {
+    const doc = await this.get(id);
+    if (doc.text_extraction_status === 'succeeded' || doc.text_extraction_status === 'manual') {
+      throw ApiError.conflict('ALREADY_EXTRACTED', 'Document text has already been extracted');
+    }
+    if (!doc.s3_key) {
+      throw ApiError.conflict('NO_STORED_BYTES', 'Document has no stored file to extract from');
+    }
+    if (doc.s3_bucket && this.storage.kind === 'local') {
+      throw ApiError.conflict(
+        'STORAGE_MISMATCH',
+        'Document bytes live in S3 but this environment uses local storage',
+      );
+    }
+    const bytes = await this.storage.get(doc.s3_key);
+    if (!bytes) throw ApiError.notFound('Stored document bytes');
+
+    const text = await extractText(bytes, doc.file_type ?? '', doc.filename);
+    const chunks = text ? await this.createChunks(doc.id, text) : [];
+    const updated = text
+      ? (await this.store.documents.update(doc.id, { text_extraction_status: 'succeeded' }))!
+      : doc;
+
+    await this.audit.record('document.extraction_attempted', {
+      actor: actor.email,
+      payload: {
+        document_id: doc.id,
+        filename: doc.filename,
+        succeeded: !!text,
+        chunk_count: chunks.length,
+      },
+    });
+    return { ...updated, chunks };
   }
 
   async detail(id: string) {
@@ -165,6 +231,7 @@ export class DocumentService {
       section_label: body.section_label ?? null,
       embedding_id: null,
     });
+    await this.embedChunks([chunk]);
     await this.audit.record('chunk.created', {
       actor: actor.email,
       payload: { document_id: documentId, chunk_id: chunk.id, chunk_index: chunk.chunk_index },
