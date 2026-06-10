@@ -35,6 +35,7 @@ import type {
   Page,
   Store,
   TaskFilter,
+  UsageSummary,
 } from './interfaces';
 
 const now = () => new Date().toISOString();
@@ -133,6 +134,52 @@ export class MemoryStore implements Store {
     },
     listByTask: async (taskId: string) =>
       [...this.runsById.values()].filter((r) => r.task_id === taskId).sort(byCreatedDesc),
+    usageSummary: async (sinceIso: string): Promise<UsageSummary> => {
+      const rows = [...this.runsById.values()].filter((r) => r.created_at >= sinceIso);
+      const agg = () => ({ runs: 0, tokens_in: 0, tokens_out: 0, cost: 0 });
+      const totals = agg();
+      const byWorkflow = new Map<string, ReturnType<typeof agg>>();
+      const byDay = new Map<string, { runs: number; cost: number }>();
+      for (const r of rows) {
+        const cost = Number(r.estimated_cost ?? 0);
+        totals.runs += 1;
+        totals.tokens_in += r.token_input_count ?? 0;
+        totals.tokens_out += r.token_output_count ?? 0;
+        totals.cost += cost;
+        const w = byWorkflow.get(r.workflow_name) ?? agg();
+        w.runs += 1;
+        w.tokens_in += r.token_input_count ?? 0;
+        w.tokens_out += r.token_output_count ?? 0;
+        w.cost += cost;
+        byWorkflow.set(r.workflow_name, w);
+        const day = r.created_at.slice(0, 10);
+        const d = byDay.get(day) ?? { runs: 0, cost: 0 };
+        d.runs += 1;
+        d.cost += cost;
+        byDay.set(day, d);
+      }
+      return {
+        since: sinceIso,
+        totals: {
+          runs: totals.runs,
+          tokens_in: totals.tokens_in,
+          tokens_out: totals.tokens_out,
+          estimated_cost: totals.cost.toFixed(6),
+        },
+        by_workflow: [...byWorkflow.entries()]
+          .map(([workflow_name, w]) => ({
+            workflow_name,
+            runs: w.runs,
+            tokens_in: w.tokens_in,
+            tokens_out: w.tokens_out,
+            estimated_cost: w.cost.toFixed(6),
+          }))
+          .sort((a, b) => Number(b.estimated_cost) - Number(a.estimated_cost) || b.runs - a.runs),
+        by_day: [...byDay.entries()]
+          .map(([day, d]) => ({ day, runs: d.runs, estimated_cost: d.cost.toFixed(6) }))
+          .sort((a, b) => a.day.localeCompare(b.day)),
+      };
+    },
   };
 
   outputs = {

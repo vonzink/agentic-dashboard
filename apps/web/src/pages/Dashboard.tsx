@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuditLog, useHealth, useReviewQueue, useTasks, useWorkflows } from '../api/hooks';
+import { useAuditLog, useHealth, useReviewQueue, useTasks, useUsage, useWorkflows } from '../api/hooks';
 import { ErrorState, Loading } from '../components/States';
-import { fmtDate, titleCase } from '../lib/format';
+import { fmtCost, fmtDate, titleCase } from '../lib/format';
 
 export function DashboardPage() {
   const navigate = useNavigate();
@@ -10,6 +10,7 @@ export function DashboardPage() {
   const recentAudit = useAuditLog({ pageSize: 8 });
   const health = useHealth();
   const workflows = useWorkflows();
+  const usage = useUsage(30);
 
   if (openTasks.isError) {
     return <ErrorState error={openTasks.error} onRetry={() => openTasks.refetch()} />;
@@ -54,6 +55,37 @@ export function DashboardPage() {
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="panel" style={{ marginTop: 16 }}>
+        <h2>AI usage — last 30 days</h2>
+        {usage.isPending && <Loading />}
+        {usage.data && (
+          <>
+            <p className="muted">
+              {usage.data.totals.runs} run(s) · {usage.data.totals.tokens_in.toLocaleString()} tokens in
+              / {usage.data.totals.tokens_out.toLocaleString()} out · estimated spend{' '}
+              <strong>{fmtCost(usage.data.totals.estimated_cost)}</strong>
+            </p>
+            {usage.data.by_workflow.length > 0 && (
+              <table className="data">
+                <thead>
+                  <tr><th>Workflow</th><th>Runs</th><th>Tokens in / out</th><th>Est. cost</th></tr>
+                </thead>
+                <tbody>
+                  {usage.data.by_workflow.map((w) => (
+                    <tr key={w.workflow_name}>
+                      <td>{titleCase(w.workflow_name)}</td>
+                      <td>{w.runs}</td>
+                      <td>{w.tokens_in.toLocaleString()} / {w.tokens_out.toLocaleString()}</td>
+                      <td>{fmtCost(w.estimated_cost)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </>
+        )}
       </div>
 
       <div className="row" style={{ marginTop: 16 }}>

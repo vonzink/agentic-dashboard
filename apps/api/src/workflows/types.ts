@@ -85,6 +85,15 @@ export const sopLookupSchema = z.object({
   ...common,
 });
 
+/** Public-facing website Q&A: like SOP lookup plus a mandatory disclaimer. */
+export const websiteQaSchema = z.object({
+  summary: z.string(),
+  answer: z.string(),
+  disclaimer: z.string(),
+  suggested_followups: z.array(z.string()).default([]),
+  ...common,
+});
+
 /** Shared shape for the file-review agents (income/asset/credit/title). */
 export const fileReviewSchema = z.object({
   summary: z.string(),

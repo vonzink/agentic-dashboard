@@ -39,9 +39,13 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
     });
     return;
   }
-  // Unknown error: log it, return a generic message (no internals leak).
-  console.error(`[error] ${req.method} ${req.path}`, err);
-  res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } });
+  // Unknown error: log it with the request id, return a generic message
+  // (no internals leak); clients can quote the id from the x-request-id
+  // header when reporting issues.
+  console.error(`[error] request_id=${req.requestId ?? '-'} ${req.method} ${req.path}`, err);
+  res.status(500).json({
+    error: { code: 'INTERNAL_ERROR', message: 'Internal server error', details: { request_id: req.requestId } },
+  });
 }
 
 export function notFoundHandler(_req: Request, res: Response) {

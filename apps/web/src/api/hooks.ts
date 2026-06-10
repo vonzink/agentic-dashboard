@@ -20,6 +20,7 @@ import type {
   SourceChunk,
   SourceDocument,
   Task,
+  UsageSummary,
   TaskDetail,
   TaskInput,
   WorkflowInfo,
@@ -326,5 +327,15 @@ export function useChunkSearch(q: string, k = 5) {
     queryKey: ['search', q, k],
     queryFn: () => apiFetch<{ items: SearchHit[]; model: string }>('/search', { query: { q, k } }),
     enabled: q.trim().length >= 2,
+  });
+}
+
+// ---------- usage / cost ----------
+
+export function useUsage(days = 30) {
+  return useQuery({
+    queryKey: ['usage', days],
+    queryFn: () => apiFetch<UsageSummary>('/usage', { query: { days } }),
+    staleTime: 60_000,
   });
 }

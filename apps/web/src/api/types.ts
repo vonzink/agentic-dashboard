@@ -335,3 +335,18 @@ export interface SearchHit {
   page_number: number | null;
   score: number;
 }
+
+/** GET /usage — AI spend/usage aggregates. */
+export interface UsageSummary {
+  days: number;
+  since: string;
+  totals: { runs: number; tokens_in: number; tokens_out: number; estimated_cost: string };
+  by_workflow: {
+    workflow_name: string;
+    runs: number;
+    tokens_in: number;
+    tokens_out: number;
+    estimated_cost: string;
+  }[];
+  by_day: { day: string; runs: number; estimated_cost: string }[];
+}

@@ -21,6 +21,7 @@ code. **Changes to anything referenced here require explicit human sign-off**
 | Update Monday.com / GHL / LendingPad | Same gate; no adapters exist in MVP (`TARGET_NOT_IMPLEMENTED`), and execution is globally off by default (`INTEGRATION_EXECUTION_ENABLED=false`). |
 | Make lending decisions / approve or deny borrowers | Workflows are draft-only graphs with no tools (docs/LANGGRAPH_WORKFLOWS.md); prompts prohibit it; every output forces `requires_human_review=true` in code, not prompt. |
 | Quote final rates/terms without reviewed sources | Prompt rules + `borrower_email_draft.assess()` flags approval/denial/rate wording + human review is mandatory before anything leaves the system. |
+| Publish public website content | `website_qa` drafts only from approved content with a mandatory consumer disclaimer; commitment wording is flagged by `assess()`; publication is a human act outside this system. |
 | Make unsupported guideline claims | `sop_lookup_answer` answers only from provided sources; no sources ⇒ confidence forced LOW + explicit warning; uncited answers warned. |
 | Hide uncertainty | Confidence labels are server-assessed (`assess()`), can only be capped down, never up; warnings are merged into the stored output and rendered in the UI. |
 

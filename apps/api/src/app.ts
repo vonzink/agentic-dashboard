@@ -3,6 +3,7 @@ import type { AppConfig } from './config';
 import { authMiddleware } from './middleware/auth';
 import type { CognitoVerifier } from './middleware/cognito';
 import { errorHandler, notFoundHandler } from './middleware/error';
+import { requestLog } from './middleware/requestLog';
 import type { Store } from './repositories/interfaces';
 import { buildRouter } from './routes';
 import { buildServices, type Services } from './services';
@@ -19,6 +20,7 @@ export function buildApp(
   const app = express();
 
   app.disable('x-powered-by');
+  app.use(requestLog());
   app.use(express.json({ limit: '2mb' }));
   app.use('/api/ai', authMiddleware(config, deps.verifier), buildRouter(services));
   app.use(notFoundHandler);

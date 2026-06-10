@@ -22,6 +22,7 @@ import {
   searchQuery,
   updatePromptBody,
   updateTaskBody,
+  usageQuery,
   uploadDocumentFields,
 } from '../types/dto';
 import { PLANNED_WORKFLOWS, WORKFLOWS } from '../workflows/registry';
@@ -217,6 +218,13 @@ export function buildRouter(s: Services): Router {
   r.get('/search', requireRole('viewer'), async (req, res) => {
     const { q, k } = searchQuery.parse(req.query);
     res.json({ items: await s.retrieval.search(q, k), model: s.embedder.model });
+  });
+
+  // ----- usage / cost reporting ----------------------------------------------------
+  r.get('/usage', requireRole('viewer'), async (req, res) => {
+    const { days } = usageQuery.parse(req.query);
+    const since = new Date(Date.now() - days * 86_400_000).toISOString();
+    res.json({ days, ...(await s.store.runs.usageSummary(since)) });
   });
 
   // ----- prompts (admin) ----------------------------------------------------------

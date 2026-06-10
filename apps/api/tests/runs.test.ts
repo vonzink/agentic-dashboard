@@ -81,7 +81,7 @@ describe('workflow runs', () => {
     expect(res.status).toBe(400);
   });
 
-  it('runs all eight implemented workflows end to end', async () => {
+  it('runs all nine implemented workflows end to end', async () => {
     const { app } = await buildTestApp();
     for (const [workflow, taskType] of [
       ['condition_response_draft', 'condition_response'],
@@ -92,6 +92,7 @@ describe('workflow runs', () => {
       ['asset_review', 'asset_review'],
       ['credit_review', 'credit_review'],
       ['title_insurance_review', 'title_insurance_review'],
+      ['website_qa', 'website_qa'],
     ] as const) {
       const task = await createTask(app, as.operator, { title: workflow, task_type: taskType });
       await addInput(app, task.id, { input_type: 'other', content: 'Synthetic test context.' });

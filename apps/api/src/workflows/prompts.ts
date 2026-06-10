@@ -212,6 +212,37 @@ export const FILE_REVIEW_PROMPTS: DefaultPrompt[] = [
 
 DEFAULT_PROMPTS.push(...FILE_REVIEW_PROMPTS);
 
+DEFAULT_PROMPTS.push({
+  name: 'website_qa',
+  task_type: 'website_qa',
+  system_prompt: COMPLIANCE_PREAMBLE,
+  user_prompt_template: `Draft a public-facing answer to the website visitor's mortgage question below, USING ONLY the approved content snippets provided. This answer will be reviewed by a human before it is ever published — nothing you write is posted automatically.
+
+Hard rules for public answers:
+- Never state or imply approval, denial, a specific rate/APR, or any guarantee.
+- If the approved content does not answer the question, say so plainly and suggest speaking with a loan officer — do not answer from general knowledge.
+- Friendly, plain-English tone; no jargon without a one-line explanation.
+- Always include the consumer disclaimer.
+
+VISITOR QUESTION:
+{{primary_text}}
+
+APPROVED CONTENT SNIPPETS (cite these):
+{{sources}}
+
+Respond with JSON exactly matching:
+{
+  "summary": "one-line restatement of the question",
+  "answer": "the public-facing answer, grounded in the approved content, with inline [Source N] references",
+  "disclaimer": "consumer disclaimer recommending a licensed MSFG loan officer; not an offer, approval, or rate quote",
+  "suggested_followups": ["related questions the visitor might ask next"],
+  "citations": [{"source_label": "...", "citation_text": "exact supporting text", "page_number": null}],
+  "confidence_label": "HIGH|MEDIUM|LOW",
+  "requires_human_review": true,
+  "warnings": ["state clearly if approved content is weak, missing, or conflicting"]
+}`,
+});
+
 /** {{placeholder}} substitution; unknown placeholders render as ''. */
 export function renderTemplate(template: string, vars: Record<string, string>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => vars[key] ?? '');

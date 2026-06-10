@@ -54,9 +54,10 @@ Key properties:
 | `asset_review` | asset_review | (same shape) | Funds-to-close, large deposits, sourcing gaps |
 | `credit_review` | credit_review | (same shape) | Disputes, inquiries, undisclosed debts; never implies a credit decision |
 | `title_insurance_review` | title_insurance_review | (same shape) | Vesting, liens, coverage gaps |
+| `website_qa` | website_qa | summary, answer, disclaimer, suggested_followups, citations | Public-facing: answers ONLY from approved content; commitment wording (rates/approvals/guarantees) flagged; mandatory consumer disclaimer; human publishes, never auto-posted |
 
-Planned agents (config exists, `is_active=false`, no implementation):
-website_qa (Phase 3).
+The full nine-agent roster from the PRD is implemented; no planned agents
+remain.
 
 ## Adding a workflow
 

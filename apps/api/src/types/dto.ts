@@ -80,6 +80,10 @@ export const searchQuery = z.object({
   k: z.coerce.number().int().min(1).max(20).default(5),
 });
 
+export const usageQuery = z.object({
+  days: z.coerce.number().int().min(1).max(365).default(30),
+});
+
 export const approveBody = z.object({
   reviewer_notes: z.string().max(5_000).nullish(),
   edited_final_content: z.string().max(100_000).nullish(),

@@ -7,6 +7,7 @@ import {
   fileReviewSchema,
   renderSources,
   sopLookupSchema,
+  websiteQaSchema,
   type WorkflowDefinition,
   type WorkflowInput,
 } from './types';
@@ -261,6 +262,61 @@ export const titleInsuranceReview = makeFileReviewAgent({
   mockMissing: 'Updated homeowner insurance declaration page (mock)',
 });
 
+const PUBLIC_DISCLAIMER =
+  'This is general information, not a loan offer, approval, or rate quote. Rates and program availability change; please speak with a licensed MSFG loan officer for guidance specific to your situation.';
+
+/** Detects commitment-style wording a public answer must never contain. */
+const COMMITMENT_WORDING =
+  /\b(you (are|'re) (approved|denied)|guaranteed|we guarantee|locked? rate|your rate (is|will be)|\d+(\.\d+)?\s?% (apr|rate))\b/i;
+
+export const websiteQa: WorkflowDefinition = {
+  name: 'website_qa',
+  taskType: 'website_qa',
+  description:
+    'Drafts public-facing answers to website mortgage questions from approved content, with citations and a mandatory disclaimer (human-published only)',
+  outputType: 'answer',
+  outputSchema: websiteQaSchema,
+  buildUserContext: (input) => renderSources(input.sources),
+  mainContent: (s) => `${str(s.answer)}\n\n${str(s.disclaimer)}`,
+  mockOutput: (input) => ({
+    summary: input.primary_text.slice(0, 120) || 'Website question (mock)',
+    answer: input.sources.length
+      ? `Great question! Per our published guidance (${input.sources[0]!.source_label}): ${input.sources[0]!.content.slice(0, 160)} [MOCK ANSWER]`
+      : 'We do not have published content that answers this yet. [MOCK ANSWER]',
+    disclaimer: PUBLIC_DISCLAIMER,
+    suggested_followups: ['What documents do I need to get pre-approved? (mock)'],
+    citations: mockCitations(input),
+    confidence_label: input.sources.length ? 'MEDIUM' : 'LOW',
+    requires_human_review: true,
+    warnings: [],
+  }),
+  assess: (s, input) => {
+    const warnings: string[] = [];
+    let confidence = conf(s.confidence_label);
+    if (!input.sources.length) {
+      warnings.push(
+        'No approved website/SOP content was provided or retrieved — this public answer cannot be verified and must not be published.',
+      );
+      confidence = 'LOW';
+    } else if (!(Array.isArray(s.citations) && s.citations.length)) {
+      warnings.push('Public answer cites no approved sources — treat as unverified.');
+      confidence = capConfidence(confidence, 'LOW');
+    }
+    if (COMMITMENT_WORDING.test(str(s.answer))) {
+      warnings.push(
+        'Answer appears to state a rate, approval, or guarantee — public answers must never make commitments. Review carefully.',
+      );
+      confidence = capConfidence(confidence, 'LOW');
+    }
+    if (!str(s.disclaimer).trim()) {
+      warnings.push('Mandatory consumer disclaimer is missing.');
+      confidence = capConfidence(confidence, 'LOW');
+    }
+    warnings.push('Public-facing content: a human must review and publish; nothing is posted automatically.');
+    return { warnings, confidence };
+  },
+};
+
 /** Implemented workflows, by name. */
 export const WORKFLOWS: Record<string, WorkflowDefinition> = Object.fromEntries(
   [
@@ -272,13 +328,16 @@ export const WORKFLOWS: Record<string, WorkflowDefinition> = Object.fromEntries(
     assetReview,
     creditReview,
     titleInsuranceReview,
+    websiteQa,
   ].map((w) => [w.name, w]),
 );
 
-/** Planned agents that have configs but no implementation yet (Phase 3). */
-export const PLANNED_WORKFLOWS = [
-  { workflow_name: 'website_qa', task_type: 'website_qa', description: 'Website Mortgage Q&A Agent (Phase 3)' },
-] as const;
+/** Agents planned but not yet implemented (none — full PRD roster shipped). */
+export const PLANNED_WORKFLOWS: {
+  workflow_name: string;
+  task_type: TaskType;
+  description: string;
+}[] = [];
 
 export function mockOutputFor(workflowName: string, input: WorkflowInput): Record<string, unknown> {
   const def = WORKFLOWS[workflowName];

@@ -62,6 +62,20 @@ export type NewPromptTemplate = Omit<PromptTemplate, 'id' | 'created_at'>;
 export type NewWorkflowConfig = Omit<WorkflowConfig, 'id' | 'created_at' | 'updated_at'>;
 export type NewIntegrationAction = Omit<IntegrationAction, 'id' | 'created_at' | 'completed_at'>;
 
+/** Aggregated AI usage/cost figures (PRD: AI cost monitoring). */
+export interface UsageSummary {
+  since: string;
+  totals: { runs: number; tokens_in: number; tokens_out: number; estimated_cost: string };
+  by_workflow: {
+    workflow_name: string;
+    runs: number;
+    tokens_in: number;
+    tokens_out: number;
+    estimated_cost: string;
+  }[];
+  by_day: { day: string; runs: number; estimated_cost: string }[];
+}
+
 /** A chunk + its retrieval vector (kept off the SourceChunk API type). */
 export interface EmbeddedChunk {
   chunk_id: string;
@@ -118,6 +132,8 @@ export interface Store {
       >,
     ): Promise<TaskRun | null>;
     listByTask(taskId: string): Promise<TaskRun[]>;
+    /** Token/cost aggregates for runs created at/after `sinceIso`. */
+    usageSummary(sinceIso: string): Promise<UsageSummary>;
   };
   outputs: {
     create(o: NewAiOutput): Promise<AiOutput>;

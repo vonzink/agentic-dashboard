@@ -35,6 +35,7 @@ import type {
   Page,
   Store,
   TaskFilter,
+  UsageSummary,
 } from './interfaces';
 
 const iso = (v: Date | string | null): string | null =>
@@ -231,6 +232,40 @@ export class PgStore implements Store {
         [taskId],
       );
       return rows.map(mapRun);
+    },
+    usageSummary: async (sinceIso: string): Promise<UsageSummary> => {
+      const totals = await this.db.query(
+        `SELECT count(*)::int AS runs,
+                COALESCE(SUM(token_input_count), 0)::int AS tokens_in,
+                COALESCE(SUM(token_output_count), 0)::int AS tokens_out,
+                COALESCE(SUM(estimated_cost), 0)::text AS estimated_cost
+           FROM ai_task_runs WHERE created_at >= $1`,
+        [sinceIso],
+      );
+      const byWorkflow = await this.db.query(
+        `SELECT workflow_name, count(*)::int AS runs,
+                COALESCE(SUM(token_input_count), 0)::int AS tokens_in,
+                COALESCE(SUM(token_output_count), 0)::int AS tokens_out,
+                COALESCE(SUM(estimated_cost), 0)::text AS estimated_cost
+           FROM ai_task_runs WHERE created_at >= $1
+          GROUP BY workflow_name
+          ORDER BY SUM(estimated_cost) DESC NULLS LAST, count(*) DESC`,
+        [sinceIso],
+      );
+      const byDay = await this.db.query(
+        `SELECT to_char(date_trunc('day', created_at), 'YYYY-MM-DD') AS day,
+                count(*)::int AS runs,
+                COALESCE(SUM(estimated_cost), 0)::text AS estimated_cost
+           FROM ai_task_runs WHERE created_at >= $1
+          GROUP BY 1 ORDER BY 1 ASC`,
+        [sinceIso],
+      );
+      return {
+        since: sinceIso,
+        totals: totals.rows[0],
+        by_workflow: byWorkflow.rows,
+        by_day: byDay.rows,
+      };
     },
   };
 

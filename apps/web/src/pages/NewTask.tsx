@@ -9,6 +9,7 @@ import { titleCase } from '../lib/format';
 const PRIMARY_INPUT: Partial<Record<TaskType, InputType>> = {
   condition_response: 'condition_text',
   sop_lookup: 'question',
+  website_qa: 'question',
   borrower_email: 'instruction',
   document_checklist: 'scenario',
   income_review: 'scenario',
@@ -26,7 +27,7 @@ export function NewTaskPage() {
 
   const VALID_TYPES: TaskType[] = [
     'condition_response', 'borrower_email', 'document_checklist', 'sop_lookup',
-    'income_review', 'asset_review', 'credit_review', 'title_insurance_review', 'general',
+    'income_review', 'asset_review', 'credit_review', 'title_insurance_review', 'website_qa', 'general',
   ];
   const requested = params.get('task_type');
   const [form, setForm] = useState({

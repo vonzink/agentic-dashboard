@@ -101,7 +101,7 @@ function RunDialog({ task }: { task: TaskDetail }) {
   const implemented = workflows.data?.items.filter((w) => w.implemented && w.is_active) ?? [];
   const [workflow, setWorkflow] = useState('');
   const [tone, setTone] = useState('');
-  const [retrieve, setRetrieve] = useState(task.task_type === 'sop_lookup');
+  const [retrieve, setRetrieve] = useState(task.task_type === 'sop_lookup' || task.task_type === 'website_qa');
   const selected = workflow || implemented.find((w) => w.task_type === task.task_type)?.workflow_name || '';
 
   return (
