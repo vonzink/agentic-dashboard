@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from 'pg';
 import type {
   AiOutput,
   Approval,
+  Company,
   AuditEvent,
   Citation,
   IntegrationAction,
@@ -18,6 +19,7 @@ import type {
   ActionFilter,
   AuditFilter,
   EmbeddedChunk,
+  NewCompany,
   NewAiOutput,
   NewApproval,
   NewAuditEvent,
@@ -43,6 +45,7 @@ const iso = (v: Date | string | null): string | null =>
 
 /* Row mappers: convert pg Date objects to ISO strings; jsonb arrives parsed. */
 /* eslint-disable @typescript-eslint/no-explicit-any */
+const mapCompany = (r: any): Company => ({ ...r, created_at: iso(r.created_at)! });
 const mapTask = (r: any): Task => ({
   ...r,
   due_at: iso(r.due_at),
@@ -125,14 +128,45 @@ export class PgStore implements Store {
     }
   }
 
+  companies = {
+    create: async (c: NewCompany): Promise<Company> => {
+      const { rows } = await this.db.query(
+        'INSERT INTO ai_companies (name, slug, is_active) VALUES ($1,$2,$3) RETURNING *',
+        [c.name, c.slug, c.is_active],
+      );
+      return mapCompany(rows[0]);
+    },
+    get: async (id: string) => {
+      const { rows } = await this.db.query('SELECT * FROM ai_companies WHERE id = $1', [id]);
+      return rows[0] ? mapCompany(rows[0]) : null;
+    },
+    getBySlug: async (slug: string) => {
+      const { rows } = await this.db.query('SELECT * FROM ai_companies WHERE slug = $1', [slug]);
+      return rows[0] ? mapCompany(rows[0]) : null;
+    },
+    list: async () => {
+      const { rows } = await this.db.query('SELECT * FROM ai_companies ORDER BY name ASC');
+      return rows.map(mapCompany);
+    },
+    update: async (id: string, patch: Record<string, unknown>) => {
+      if (!Object.keys(patch).length) return this.companies.get(id);
+      const { sets, values, next } = setClause(patch);
+      const { rows } = await this.db.query(
+        `UPDATE ai_companies SET ${sets} WHERE id = $${next} RETURNING *`,
+        [...values, id],
+      );
+      return rows[0] ? mapCompany(rows[0]) : null;
+    },
+  };
+
   tasks = {
     create: async (t: NewTask): Promise<Task> => {
       const { rows } = await this.db.query(
-        `INSERT INTO ai_tasks (title, task_type, status, priority, created_by,
+        `INSERT INTO ai_tasks (title, task_type, status, priority, company_id, created_by,
            assigned_to, borrower_reference, loan_reference, due_at, metadata_json)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
         [
-          t.title, t.task_type, t.status, t.priority, t.created_by,
+          t.title, t.task_type, t.status, t.priority, t.company_id, t.created_by,
           t.assigned_to, t.borrower_reference, t.loan_reference, t.due_at,
           JSON.stringify(t.metadata_json),
         ],
@@ -159,6 +193,7 @@ export class PgStore implements Store {
         params.push(value);
         where.push(cond.replace('?', `$${params.length}`));
       };
+      if (filter.company_id) add('company_id = ?', filter.company_id);
       if (filter.status) add('status = ?', filter.status);
       if (filter.task_type) add('task_type = ?', filter.task_type);
       if (filter.priority) add('priority = ?', filter.priority);
@@ -233,32 +268,40 @@ export class PgStore implements Store {
       );
       return rows.map(mapRun);
     },
-    usageSummary: async (sinceIso: string): Promise<UsageSummary> => {
+    usageSummary: async (sinceIso: string, companyId?: string): Promise<UsageSummary> => {
+      const params: unknown[] = [sinceIso];
+      let companySql = '';
+      if (companyId) {
+        params.push(companyId);
+        companySql = ' AND t.company_id = $2';
+      }
+      const base = `FROM ai_task_runs r JOIN ai_tasks t ON t.id = r.task_id
+          WHERE r.created_at >= $1${companySql}`;
       const totals = await this.db.query(
         `SELECT count(*)::int AS runs,
-                COALESCE(SUM(token_input_count), 0)::int AS tokens_in,
-                COALESCE(SUM(token_output_count), 0)::int AS tokens_out,
-                COALESCE(SUM(estimated_cost), 0)::text AS estimated_cost
-           FROM ai_task_runs WHERE created_at >= $1`,
-        [sinceIso],
+                COALESCE(SUM(r.token_input_count), 0)::int AS tokens_in,
+                COALESCE(SUM(r.token_output_count), 0)::int AS tokens_out,
+                COALESCE(SUM(r.estimated_cost), 0)::text AS estimated_cost
+           ${base}`,
+        params,
       );
       const byWorkflow = await this.db.query(
-        `SELECT workflow_name, count(*)::int AS runs,
-                COALESCE(SUM(token_input_count), 0)::int AS tokens_in,
-                COALESCE(SUM(token_output_count), 0)::int AS tokens_out,
-                COALESCE(SUM(estimated_cost), 0)::text AS estimated_cost
-           FROM ai_task_runs WHERE created_at >= $1
-          GROUP BY workflow_name
-          ORDER BY SUM(estimated_cost) DESC NULLS LAST, count(*) DESC`,
-        [sinceIso],
+        `SELECT r.workflow_name, count(*)::int AS runs,
+                COALESCE(SUM(r.token_input_count), 0)::int AS tokens_in,
+                COALESCE(SUM(r.token_output_count), 0)::int AS tokens_out,
+                COALESCE(SUM(r.estimated_cost), 0)::text AS estimated_cost
+           ${base}
+          GROUP BY r.workflow_name
+          ORDER BY SUM(r.estimated_cost) DESC NULLS LAST, count(*) DESC`,
+        params,
       );
       const byDay = await this.db.query(
-        `SELECT to_char(date_trunc('day', created_at), 'YYYY-MM-DD') AS day,
+        `SELECT to_char(date_trunc('day', r.created_at), 'YYYY-MM-DD') AS day,
                 count(*)::int AS runs,
-                COALESCE(SUM(estimated_cost), 0)::text AS estimated_cost
-           FROM ai_task_runs WHERE created_at >= $1
+                COALESCE(SUM(r.estimated_cost), 0)::text AS estimated_cost
+           ${base}
           GROUP BY 1 ORDER BY 1 ASC`,
-        [sinceIso],
+        params,
       );
       return {
         since: sinceIso,
@@ -368,15 +411,19 @@ export class PgStore implements Store {
   audit = {
     append: async (e: NewAuditEvent): Promise<AuditEvent> => {
       const { rows } = await this.db.query(
-        `INSERT INTO ai_audit_events (task_id, actor_user_id, event_type, event_payload_json)
-         VALUES ($1,$2,$3,$4) RETURNING *`,
-        [e.task_id, e.actor_user_id, e.event_type, JSON.stringify(e.event_payload_json)],
+        `INSERT INTO ai_audit_events (task_id, company_id, actor_user_id, event_type, event_payload_json)
+         VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+        [e.task_id, e.company_id, e.actor_user_id, e.event_type, JSON.stringify(e.event_payload_json)],
       );
       return mapAudit(rows[0]);
     },
     list: async (filter: AuditFilter): Promise<Paginated<AuditEvent>> => {
       const where: string[] = [];
       const params: unknown[] = [];
+      if (filter.company_id) {
+        params.push(filter.company_id);
+        where.push(`company_id = $${params.length}`);
+      }
       if (filter.event_type) {
         params.push(filter.event_type);
         where.push(`event_type = $${params.length}`);
@@ -413,11 +460,11 @@ export class PgStore implements Store {
     create: async (d: NewSourceDocument): Promise<SourceDocument> => {
       const { rows } = await this.db.query(
         `INSERT INTO ai_source_documents (filename, file_type, s3_bucket, s3_key,
-           text_extraction_status, document_type, classification, created_by, metadata_json)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+           text_extraction_status, document_type, classification, company_id, created_by, metadata_json)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
         [
           d.filename, d.file_type, d.s3_bucket, d.s3_key, d.text_extraction_status,
-          d.document_type, d.classification, d.created_by, JSON.stringify(d.metadata_json),
+          d.document_type, d.classification, d.company_id, d.created_by, JSON.stringify(d.metadata_json),
         ],
       );
       return mapDocument(rows[0]);
@@ -435,13 +482,18 @@ export class PgStore implements Store {
       );
       return rows[0] ? mapDocument(rows[0]) : null;
     },
-    list: async (filter: Page & { document_type?: string }) => {
+    list: async (filter: Page & { document_type?: string; company_id?: string }) => {
       const params: unknown[] = [];
-      let whereSql = '';
+      const where: string[] = [];
       if (filter.document_type) {
         params.push(filter.document_type);
-        whereSql = ' WHERE document_type = $1';
+        where.push(`document_type = $${params.length}`);
       }
+      if (filter.company_id) {
+        params.push(filter.company_id);
+        where.push(`company_id = $${params.length}`);
+      }
+      const whereSql = where.length ? ` WHERE ${where.join(' AND ')}` : '';
       const count = await this.db.query(
         `SELECT count(*)::int AS n FROM ai_source_documents${whereSql}`,
         params,
@@ -492,12 +544,19 @@ export class PgStore implements Store {
         [JSON.stringify(embedding), model, chunkId],
       );
     },
-    listEmbedded: async (model: string): Promise<EmbeddedChunk[]> => {
+    listEmbedded: async (model: string, companyId?: string): Promise<EmbeddedChunk[]> => {
+      const params: unknown[] = [model];
+      let companySql = '';
+      if (companyId) {
+        params.push(companyId);
+        companySql = ' AND d.company_id = $2';
+      }
       const { rows } = await this.db.query(
-        `SELECT id, document_id, content, section_label, page_number, embedding_json
-           FROM ai_source_chunks
-          WHERE embedding_model = $1 AND embedding_json IS NOT NULL`,
-        [model],
+        `SELECT c.id, c.document_id, c.content, c.section_label, c.page_number, c.embedding_json
+           FROM ai_source_chunks c
+           JOIN ai_source_documents d ON d.id = c.document_id
+          WHERE c.embedding_model = $1 AND c.embedding_json IS NOT NULL${companySql}`,
+        params,
       );
       return rows.map((r) => ({
         chunk_id: r.id,

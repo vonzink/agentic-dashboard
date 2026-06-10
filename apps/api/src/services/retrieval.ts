@@ -23,9 +23,10 @@ export class RetrievalService {
     private embedder: EmbeddingProvider,
   ) {}
 
-  async search(query: string, k = 5): Promise<RetrievalHit[]> {
+  /** `companyId` scopes the candidate set to one client's documents. */
+  async search(query: string, k = 5, companyId?: string): Promise<RetrievalHit[]> {
     const [queryVec] = await this.embedder.embed([query]);
-    const rows = await this.store.chunks.listEmbedded(this.embedder.model);
+    const rows = await this.store.chunks.listEmbedded(this.embedder.model, companyId);
     const scored = rows
       .map((r) => ({ row: r, score: cosine(queryVec!, r.embedding) }))
       .filter((s) => s.score > 0)

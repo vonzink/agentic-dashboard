@@ -104,6 +104,7 @@ export function renderPrompt(
   input: WorkflowInput,
 ): RenderedPrompt {
   const vars: Record<string, string> = {
+    company: input.company_name || 'the client company',
     primary_text: input.primary_text,
     borrower_context: input.borrower_context ?? '(not provided)',
     scenario: input.scenario ?? '(not provided)',
@@ -118,7 +119,8 @@ export function renderPrompt(
     special_scenario: input.options.special_scenario ?? '(none)',
   };
   return {
-    system: template.system_prompt,
+    // Both halves are templates: the system preamble carries {{company}}.
+    system: renderTemplate(template.system_prompt, vars),
     user: renderTemplate(template.user_prompt_template, vars),
     version: `${template.name}@${template.version}`,
   };

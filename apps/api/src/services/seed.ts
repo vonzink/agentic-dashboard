@@ -9,6 +9,14 @@ import { PLANNED_WORKFLOWS, WORKFLOWS } from '../workflows/registry';
  * borrower data — synthetic/system rows only.
  */
 export async function seedDefaults(store: Store): Promise<void> {
+  // First client company; additional companies are created in Admin.
+  if (!(await store.companies.getBySlug('msfg'))) {
+    await store.companies.create({
+      name: 'Mountain State Financial Group',
+      slug: 'msfg',
+      is_active: true,
+    });
+  }
   for (const def of Object.values(WORKFLOWS)) {
     const existing = await store.workflowConfigs.getByName(def.name);
     if (!existing) {

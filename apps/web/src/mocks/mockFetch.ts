@@ -61,6 +61,7 @@ const run = {
 
 const ROUTES: [RegExp, () => unknown][] = [
   [/^\/health/, () => ({ status: 'ok', db: 'skipped', provider: { name: 'mock', configured: true }, version: 'mock' })],
+  [/^\/companies/, () => ({ items: [{ id: id(9), name: 'Mock Client Co', slug: 'mock', is_active: true, created_at: now }] })],
   [/^\/workflows/, () => ({
     items: [{
       id: id(5), workflow_name: 'condition_response_draft', task_type: 'condition_response',

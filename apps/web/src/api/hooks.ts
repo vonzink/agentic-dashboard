@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
 import type {
   AiOutput,
+  Company,
   ApprovalResponse,
   AuditEvent,
   Classification,
@@ -54,6 +55,34 @@ export function useIntegrationsStatus() {
   });
 }
 
+// ---------- companies ----------
+
+export function useCompanies() {
+  return useQuery({
+    queryKey: ['companies'],
+    queryFn: () => apiFetch<{ items: Company[] }>('/companies'),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useCreateCompany() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { name: string; slug: string }) =>
+      apiFetch<Company>('/companies', { method: 'POST', body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['companies'] }),
+  });
+}
+
+export function useUpdateCompany() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string; name?: string; is_active?: boolean }) =>
+      apiFetch<Company>(`/companies/${id}`, { method: 'PATCH', body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['companies'] }),
+  });
+}
+
 // ---------- tasks ----------
 
 export function useTasks(query: Query) {
@@ -77,6 +106,7 @@ export function useCreateTask() {
     mutationFn: (body: {
       title: string;
       task_type: string;
+      company_id?: string;
       priority?: string;
       assigned_to?: string;
       borrower_reference?: string;
@@ -225,6 +255,7 @@ export function useCreateDocument() {
     mutationFn: (body: {
       filename: string;
       file_type?: string;
+      company_id?: string;
       document_type?: DocumentType;
       classification?: Classification;
       s3_bucket?: string;
@@ -322,20 +353,23 @@ export function useExecuteAction() {
 
 // ---------- retrieval ----------
 
-export function useChunkSearch(q: string, k = 5) {
+export function useChunkSearch(q: string, k = 5, companyId?: string) {
   return useQuery({
-    queryKey: ['search', q, k],
-    queryFn: () => apiFetch<{ items: SearchHit[]; model: string }>('/search', { query: { q, k } }),
+    queryKey: ['search', q, k, companyId],
+    queryFn: () =>
+      apiFetch<{ items: SearchHit[]; model: string }>('/search', {
+        query: { q, k, company_id: companyId },
+      }),
     enabled: q.trim().length >= 2,
   });
 }
 
 // ---------- usage / cost ----------
 
-export function useUsage(days = 30) {
+export function useUsage(days = 30, companyId?: string) {
   return useQuery({
-    queryKey: ['usage', days],
-    queryFn: () => apiFetch<UsageSummary>('/usage', { query: { days } }),
+    queryKey: ['usage', days, companyId],
+    queryFn: () => apiFetch<UsageSummary>('/usage', { query: { days, company_id: companyId } }),
     staleTime: 60_000,
   });
 }

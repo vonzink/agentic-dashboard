@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type {
   AiOutput,
   Approval,
+  Company,
   AuditEvent,
   Citation,
   IntegrationAction,
@@ -18,6 +19,7 @@ import type {
   ActionFilter,
   AuditFilter,
   EmbeddedChunk,
+  NewCompany,
   NewAiOutput,
   NewApproval,
   NewAuditEvent,
@@ -58,6 +60,7 @@ const byCreatedDesc = <T extends { created_at: string }>(a: T, b: T) =>
  * append-only semantics (no update/delete methods exist at all).
  */
 export class MemoryStore implements Store {
+  private companiesById = new Map<string, Company>();
   private tasksById = new Map<string, Task>();
   private inputsById = new Map<string, TaskInput>();
   private runsById = new Map<string, TaskRun>();
@@ -72,6 +75,29 @@ export class MemoryStore implements Store {
   private promptsById = new Map<string, PromptTemplate>();
   private configsByName = new Map<string, WorkflowConfig>();
   private actionsById = new Map<string, IntegrationAction>();
+
+  companies = {
+    create: async (c: NewCompany): Promise<Company> => {
+      if ([...this.companiesById.values()].some((x) => x.slug === c.slug || x.name === c.name)) {
+        throw new Error('duplicate company name/slug');
+      }
+      const row: Company = { ...c, id: randomUUID(), created_at: now() };
+      this.companiesById.set(row.id, row);
+      return row;
+    },
+    get: async (id: string) => this.companiesById.get(id) ?? null,
+    getBySlug: async (slug: string) =>
+      [...this.companiesById.values()].find((c) => c.slug === slug) ?? null,
+    list: async () =>
+      [...this.companiesById.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    update: async (id: string, patch: Partial<Company>) => {
+      const existing = this.companiesById.get(id);
+      if (!existing) return null;
+      const updated = { ...existing, ...patch, id };
+      this.companiesById.set(id, updated);
+      return updated;
+    },
+  };
 
   tasks = {
     create: async (t: NewTask): Promise<Task> => {
@@ -92,6 +118,7 @@ export class MemoryStore implements Store {
       const rows = [...this.tasksById.values()]
         .filter(
           (t) =>
+            (!filter.company_id || t.company_id === filter.company_id) &&
             (!filter.status || t.status === filter.status) &&
             (!filter.task_type || t.task_type === filter.task_type) &&
             (!filter.priority || t.priority === filter.priority) &&
@@ -134,8 +161,12 @@ export class MemoryStore implements Store {
     },
     listByTask: async (taskId: string) =>
       [...this.runsById.values()].filter((r) => r.task_id === taskId).sort(byCreatedDesc),
-    usageSummary: async (sinceIso: string): Promise<UsageSummary> => {
-      const rows = [...this.runsById.values()].filter((r) => r.created_at >= sinceIso);
+    usageSummary: async (sinceIso: string, companyId?: string): Promise<UsageSummary> => {
+      const rows = [...this.runsById.values()].filter(
+        (r) =>
+          r.created_at >= sinceIso &&
+          (!companyId || this.tasksById.get(r.task_id)?.company_id === companyId),
+      );
       const agg = () => ({ runs: 0, tokens_in: 0, tokens_out: 0, cost: 0 });
       const totals = agg();
       const byWorkflow = new Map<string, ReturnType<typeof agg>>();
@@ -251,6 +282,7 @@ export class MemoryStore implements Store {
       const rows = this.auditRows
         .filter(
           (e) =>
+            (!filter.company_id || e.company_id === filter.company_id) &&
             (!filter.event_type || e.event_type === filter.event_type) &&
             (!filter.actor || e.actor_user_id === filter.actor) &&
             (!filter.task_id || e.task_id === filter.task_id),
@@ -277,9 +309,13 @@ export class MemoryStore implements Store {
       this.documentsById.set(id, updated);
       return updated;
     },
-    list: async (filter: Page & { document_type?: string }) => {
+    list: async (filter: Page & { document_type?: string; company_id?: string }) => {
       const rows = [...this.documentsById.values()]
-        .filter((d) => !filter.document_type || d.document_type === filter.document_type)
+        .filter(
+          (d) =>
+            (!filter.document_type || d.document_type === filter.document_type) &&
+            (!filter.company_id || d.company_id === filter.company_id),
+        )
         .sort(byCreatedDesc);
       return paginate(rows, filter);
     },
@@ -306,12 +342,13 @@ export class MemoryStore implements Store {
     setEmbedding: async (chunkId: string, model: string, embedding: number[]) => {
       this.embeddingsByChunk.set(chunkId, { model, embedding });
     },
-    listEmbedded: async (model: string): Promise<EmbeddedChunk[]> => {
+    listEmbedded: async (model: string, companyId?: string): Promise<EmbeddedChunk[]> => {
       const out: EmbeddedChunk[] = [];
       for (const [chunkId, e] of this.embeddingsByChunk) {
         if (e.model !== model) continue;
         const c = this.chunksById.get(chunkId);
         if (!c) continue;
+        if (companyId && this.documentsById.get(c.document_id)?.company_id !== companyId) continue;
         out.push({
           chunk_id: c.id,
           document_id: c.document_id,

@@ -18,6 +18,14 @@ export interface ApiErrorBody {
   error: { code: string; message: string; details?: unknown };
 }
 
+export interface Company {
+  id: string;
+  name: string;
+  slug: string;
+  is_active: boolean;
+  created_at: string;
+}
+
 export type TaskType =
   | 'condition_response'
   | 'borrower_email'
@@ -47,6 +55,7 @@ export interface Task {
   task_type: TaskType;
   status: TaskStatus;
   priority: TaskPriority;
+  company_id: string;
   created_by: string;
   assigned_to: string | null;
   borrower_reference: string | null;
@@ -187,6 +196,7 @@ export interface Approval {
 export interface AuditEvent {
   id: number;
   task_id: string | null;
+  company_id: string | null;
   actor_user_id: string | null;
   event_type: string;
   event_payload_json: Record<string, unknown>;
@@ -220,6 +230,7 @@ export interface SourceDocument {
   text_extraction_status: ExtractionStatus;
   document_type: DocumentType;
   classification: Classification;
+  company_id: string;
   created_by: string;
   metadata_json: Record<string, unknown>;
   created_at: string;

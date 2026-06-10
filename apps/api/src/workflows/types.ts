@@ -12,6 +12,8 @@ export interface SourceSnippet {
 
 /** Assembled input handed to every workflow run; snapshotted onto the run row. */
 export interface WorkflowInput {
+  /** Client company the task belongs to (rendered as {{company}}). */
+  company_name: string;
   task_title: string;
   task_type: TaskType;
   /** Primary text (condition text, question, request...) from task inputs. */

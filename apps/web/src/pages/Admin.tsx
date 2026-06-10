@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useCreatePrompt, usePrompts, useSetPromptActive, useWorkflows } from '../api/hooks';
+import { useCompanies, useCreateCompany, useCreatePrompt, usePrompts, useSetPromptActive, useUpdateCompany, useWorkflows } from '../api/hooks';
 import type { PromptTemplate } from '../api/types';
 import { Badge } from '../components/Badge';
 import { EmptyState, ErrorState, Loading } from '../components/States';
@@ -112,11 +112,80 @@ function NewPromptVersionForm({ existing }: { existing: PromptTemplate[] }) {
   );
 }
 
+function CompaniesTab() {
+  const companies = useCompanies();
+  const create = useCreateCompany();
+  const update = useUpdateCompany();
+  const [form, setForm] = useState({ name: '', slug: '' });
+
+  return (
+    <div>
+      <div className="panel">
+        <h2>Client companies</h2>
+        <p className="muted">
+          Every task and document belongs to a company; retrieval never crosses companies.
+          Companies deactivate rather than delete, preserving audit history.
+        </p>
+        {companies.isPending && <Loading />}
+        {companies.data && (
+          <table className="data">
+            <thead><tr><th>Name</th><th>Slug</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              {companies.data.items.map((c) => (
+                <tr key={c.id}>
+                  <td><strong>{c.name}</strong></td>
+                  <td className="mono">{c.slug}</td>
+                  <td>{c.is_active ? <span className="badge green">active</span> : <span className="badge neutral">inactive</span>}</td>
+                  <td>
+                    <button className="btn sm ghost" disabled={update.isPending}
+                      onClick={() => update.mutate({ id: c.id, is_active: !c.is_active })}>
+                      {c.is_active ? 'Deactivate' : 'Reactivate'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {update.isError && <ErrorState error={update.error} />}
+      </div>
+      <form
+        className="panel"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!form.name.trim() || !form.slug.trim()) return;
+          create.mutate(
+            { name: form.name.trim(), slug: form.slug.trim() },
+            { onSuccess: () => setForm({ name: '', slug: '' }) },
+          );
+        }}
+      >
+        <h2>Add company</h2>
+        <div className="row" style={{ alignItems: 'flex-end' }}>
+          <label className="field grow">
+            Name
+            <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          </label>
+          <label className="field">
+            Slug
+            <input type="text" value={form.slug} placeholder="acme"
+              onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase() })} />
+          </label>
+          <button className="btn primary" disabled={create.isPending || !form.name.trim() || !form.slug.trim()}>
+            Add
+          </button>
+        </div>
+        {create.isError && <ErrorState error={create.error} />}
+      </form>
+    </div>
+  );
+}
+
 export function AdminPage() {
   const role = currentIdentity().role;
   const prompts = usePrompts();
   const workflows = useWorkflows();
-  const [tab, setTab] = useState<'prompts' | 'workflows'>('prompts');
+  const [tab, setTab] = useState<'prompts' | 'workflows' | 'companies'>('prompts');
 
   if (role !== 'admin') {
     return (
@@ -138,7 +207,12 @@ export function AdminPage() {
         <button className={`btn sm ${tab === 'workflows' ? 'dark' : 'ghost'}`} onClick={() => setTab('workflows')}>
           Workflow configs
         </button>
+        <button className={`btn sm ${tab === 'companies' ? 'dark' : 'ghost'}`} onClick={() => setTab('companies')}>
+          Companies
+        </button>
       </div>
+
+      {tab === 'companies' && <CompaniesTab />}
 
       {tab === 'prompts' && (
         <>

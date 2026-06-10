@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { USE_MOCKS } from './api/client';
 import { useHealth } from './api/hooks';
+import { CompanySwitcher } from './components/CompanySwitcher';
 import { DevUserMenu } from './components/DevUserMenu';
 
 const NAV = [
@@ -31,7 +32,7 @@ export default function App() {
     <div className="layout">
       <aside className="sidebar">
         <div className="brand">
-          MSFG
+          ZVZ Solutions
           <small>Agentic AI Dashboard</small>
         </div>
         <nav>
@@ -50,6 +51,7 @@ export default function App() {
       <div className="main">
         <header className="topbar">
           <h1>{pageTitle(location.pathname)}</h1>
+          <CompanySwitcher />
           {USE_MOCKS && <span className="badge amber">MOCK DATA</span>}
           <span className={`badge env-badge ${env === 'prod' ? 'red' : env === 'local' ? 'neutral' : 'teal'}`}>
             {env}

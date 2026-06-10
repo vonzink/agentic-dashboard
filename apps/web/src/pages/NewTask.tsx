@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiFetch } from '../api/client';
-import { useCreateDocument, useCreateTask, useWorkflows } from '../api/hooks';
+import { useCompanies, useCreateDocument, useCreateTask, useWorkflows } from '../api/hooks';
+import { activeCompanyId } from '../lib/company';
 import type { InputType, TaskType } from '../api/types';
 import { ErrorState } from '../components/States';
 import { titleCase } from '../lib/format';
@@ -46,6 +47,8 @@ export function NewTaskPage() {
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
 
+  const companies = useCompanies();
+  const activeCompany = companies.data?.items.find((c) => c.id === activeCompanyId());
   const matchingWorkflow = workflows.data?.items.find(
     (w) => w.task_type === form.task_type && w.implemented,
   );
@@ -60,6 +63,7 @@ export function NewTaskPage() {
       const task = await createTask.mutateAsync({
         title: form.title.trim(),
         task_type: form.task_type,
+        company_id: activeCompanyId() ?? undefined,
         priority: form.priority,
         borrower_reference: form.borrower_reference.trim() || undefined,
         loan_reference: form.loan_reference.trim() || undefined,
@@ -75,6 +79,7 @@ export function NewTaskPage() {
           filename: form.snippet_label.trim() || `snippet-for-${task.id.slice(0, 8)}`,
           document_type: 'manual_snippet',
           classification: 'internal',
+          company_id: activeCompanyId() ?? undefined,
           content: form.snippet_text.trim(),
         });
         await apiFetch(`/tasks/${task.id}/inputs`, {
@@ -96,7 +101,7 @@ export function NewTaskPage() {
 
   return (
     <form className="panel" style={{ maxWidth: 720 }} onSubmit={submit}>
-      <h2>Create AI task</h2>
+      <h2>Create AI task{activeCompany ? ` — ${activeCompany.name}` : ''}</h2>
       {error != null && <ErrorState error={error} />}
 
       <label className="field">

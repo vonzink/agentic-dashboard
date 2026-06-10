@@ -1,5 +1,6 @@
 import type {
   AiOutput,
+  Company,
   Approval,
   AuditEvent,
   Citation,
@@ -28,6 +29,7 @@ export interface Page {
 }
 
 export interface TaskFilter extends Page {
+  company_id?: string;
   status?: TaskStatus;
   task_type?: TaskType;
   priority?: TaskPriority;
@@ -40,6 +42,7 @@ export interface OutputFilter extends Page {
 }
 
 export interface AuditFilter extends Page {
+  company_id?: string;
   event_type?: string;
   actor?: string;
   task_id?: string;
@@ -49,6 +52,7 @@ export interface ActionFilter extends Page {
   status?: ActionStatus;
 }
 
+export type NewCompany = Omit<Company, 'id' | 'created_at'>;
 export type NewTask = Omit<Task, 'id' | 'created_at' | 'updated_at'>;
 export type NewTaskInput = Omit<TaskInput, 'id' | 'created_at'>;
 export type NewTaskRun = Omit<TaskRun, 'id' | 'created_at'>;
@@ -102,6 +106,13 @@ export type OutputListItem = AiOutput & {
  * is immutable by construction at every layer.
  */
 export interface Store {
+  companies: {
+    create(c: NewCompany): Promise<Company>;
+    get(id: string): Promise<Company | null>;
+    getBySlug(slug: string): Promise<Company | null>;
+    list(): Promise<Company[]>;
+    update(id: string, patch: Partial<Pick<Company, 'name' | 'is_active'>>): Promise<Company | null>;
+  };
   tasks: {
     create(t: NewTask): Promise<Task>;
     get(id: string): Promise<Task | null>;
@@ -132,8 +143,9 @@ export interface Store {
       >,
     ): Promise<TaskRun | null>;
     listByTask(taskId: string): Promise<TaskRun[]>;
-    /** Token/cost aggregates for runs created at/after `sinceIso`. */
-    usageSummary(sinceIso: string): Promise<UsageSummary>;
+    /** Token/cost aggregates for runs created at/after `sinceIso`,
+     * optionally for one company (via the owning task). */
+    usageSummary(sinceIso: string, companyId?: string): Promise<UsageSummary>;
   };
   outputs: {
     create(o: NewAiOutput): Promise<AiOutput>;
@@ -161,7 +173,7 @@ export interface Store {
       id: string,
       patch: Partial<Pick<SourceDocument, 'text_extraction_status'>>,
     ): Promise<SourceDocument | null>;
-    list(filter: Page & { document_type?: string }): Promise<Paginated<SourceDocument>>;
+    list(filter: Page & { document_type?: string; company_id?: string }): Promise<Paginated<SourceDocument>>;
   };
   chunks: {
     create(c: NewSourceChunk): Promise<SourceChunk>;
@@ -170,10 +182,11 @@ export interface Store {
     nextIndex(documentId: string): Promise<number>;
     /** Stores the retrieval vector for a chunk (per embedding model). */
     setEmbedding(chunkId: string, model: string, embedding: number[]): Promise<void>;
-    /** All chunks embedded with `model` — the retrieval candidate set.
-     * Embeddings are deliberately NOT on the SourceChunk domain type so
-     * API payloads stay small. */
-    listEmbedded(model: string): Promise<EmbeddedChunk[]>;
+    /** Chunks embedded with `model`, optionally scoped to one company's
+     * documents (COMPLIANCE: retrieval for a task must pass its company so
+     * clients' corpora never cross). Embeddings stay off SourceChunk so
+     * API payloads remain small. */
+    listEmbedded(model: string, companyId?: string): Promise<EmbeddedChunk[]>;
   };
   citations: {
     createMany(rows: NewCitation[]): Promise<Citation[]>;

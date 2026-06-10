@@ -1,16 +1,17 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuditLog, useHealth, useReviewQueue, useTasks, useUsage, useWorkflows } from '../api/hooks';
 import { ErrorState, Loading } from '../components/States';
+import { activeCompanyId } from '../lib/company';
 import { fmtCost, fmtDate, titleCase } from '../lib/format';
 
 export function DashboardPage() {
   const navigate = useNavigate();
-  const openTasks = useTasks({ status: 'open', pageSize: 1 });
+  const openTasks = useTasks({ status: 'open', company_id: activeCompanyId() ?? undefined, pageSize: 1 });
   const reviewQueue = useReviewQueue({ review_status: 'NEEDS_REVIEW', pageSize: 5 });
   const recentAudit = useAuditLog({ pageSize: 8 });
   const health = useHealth();
   const workflows = useWorkflows();
-  const usage = useUsage(30);
+  const usage = useUsage(30, activeCompanyId() ?? undefined);
 
   if (openTasks.isError) {
     return <ErrorState error={openTasks.error} onRetry={() => openTasks.refetch()} />;

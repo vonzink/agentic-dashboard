@@ -7,17 +7,20 @@ environment = "dev"
 # Lock the dashboard down to office/VPN ranges before real use:
 # allowed_ingress_cidrs = ["203.0.113.0/24"]
 
-# TLS: issue a cert in ACM for your internal hostname, then:
-# acm_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/..."
+# Custom domain (Route 53 zone must already exist in this account).
+# Certs, validation records, and A-aliases are created automatically.
+route53_zone_name = "zvzsolutions.com"
+app_hostname      = "agentic.zvzsolutions.com"
+api_hostname      = "api.agentic.zvzsolutions.com"
 
-cognito_domain_prefix = "msfg-agentic-dev" # must be globally unique
+cognito_domain_prefix = "zvz-agentic-dev" # must be globally unique
 cognito_callback_urls = [
   "http://localhost:5173",
-  # "https://<cloudfront_domain output>",
+  "https://agentic.zvzsolutions.com",
 ]
 cognito_logout_urls = [
   "http://localhost:5173",
-  # "https://<cloudfront_domain output>",
+  "https://agentic.zvzsolutions.com",
 ]
 
 model_provider = "mock" # switch to "anthropic" after setting the key secret

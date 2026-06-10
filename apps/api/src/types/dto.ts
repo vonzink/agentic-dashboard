@@ -23,6 +23,7 @@ export type PaginationQuery = z.infer<typeof paginationQuery>;
 export const createTaskBody = z.object({
   title: z.string().min(1).max(300),
   task_type: z.enum(TASK_TYPES),
+  company_id: z.uuid().nullish(),
   priority: z.enum(TASK_PRIORITIES).default('normal'),
   assigned_to: z.string().email().nullish(),
   // References are opaque identifiers only. Never put borrower PII here.
@@ -45,6 +46,7 @@ export const updateTaskBody = z
   .refine((b) => Object.keys(b).length > 0, { message: 'empty patch' });
 
 export const listTasksQuery = paginationQuery.extend({
+  company_id: z.uuid().optional(),
   status: z.enum(TASK_STATUSES).optional(),
   task_type: z.enum(TASK_TYPES).optional(),
   priority: z.enum(TASK_PRIORITIES).optional(),
@@ -78,11 +80,27 @@ export const createRunBody = z.object({
 export const searchQuery = z.object({
   q: z.string().min(2).max(500),
   k: z.coerce.number().int().min(1).max(20).default(5),
+  company_id: z.uuid().optional(),
 });
 
 export const usageQuery = z.object({
   days: z.coerce.number().int().min(1).max(365).default(30),
+  company_id: z.uuid().optional(),
 });
+
+export const createCompanyBody = z.object({
+  name: z.string().min(1).max(200),
+  slug: z
+    .string()
+    .min(2)
+    .max(50)
+    .regex(/^[a-z0-9][a-z0-9-]*$/, 'lowercase letters, digits, hyphens'),
+});
+
+export const updateCompanyBody = z
+  .object({ name: z.string().min(1).max(200), is_active: z.boolean() })
+  .partial()
+  .refine((b) => Object.keys(b).length > 0, { message: 'empty patch' });
 
 export const approveBody = z.object({
   reviewer_notes: z.string().max(5_000).nullish(),
@@ -106,6 +124,7 @@ export const createDocumentBody = z.object({
   s3_key: z.string().max(1024).nullish(),
   /** Manual snippet text; stored as chunk 0 of the document. */
   content: z.string().max(100_000).nullish(),
+  company_id: z.uuid().nullish(),
   metadata_json: jsonObject.default({}),
 });
 
@@ -113,10 +132,12 @@ export const createDocumentBody = z.object({
 export const uploadDocumentFields = z.object({
   document_type: z.enum(DOCUMENT_TYPES).default('other'),
   classification: z.enum(CLASSIFICATIONS).default('internal'),
+  company_id: z.uuid().nullish(),
 });
 
 export const listDocumentsQuery = paginationQuery.extend({
   document_type: z.enum(DOCUMENT_TYPES).optional(),
+  company_id: z.uuid().optional(),
 });
 
 export const createChunkBody = z.object({
@@ -143,6 +164,7 @@ export const listPromptsQuery = z.object({
 });
 
 export const listAuditQuery = paginationQuery.extend({
+  company_id: z.uuid().optional(),
   event_type: z.string().optional(),
   actor: z.string().optional(),
   task_id: z.uuid().optional(),

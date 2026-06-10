@@ -36,7 +36,7 @@ describe('website_qa agent', () => {
   it('flags commitment wording and missing sources in public answers', () => {
     const noSources = websiteQa.assess(
       { answer: 'Yes you can refinance.', disclaimer: 'Talk to a licensed loan officer.', citations: [], confidence_label: 'HIGH' },
-      { task_title: '', task_type: 'website_qa', primary_text: '', borrower_context: null, scenario: null, instructions: null, sources: [], options: {} },
+      { company_name: 'Test Co', task_title: '', task_type: 'website_qa', primary_text: '', borrower_context: null, scenario: null, instructions: null, sources: [], options: {} },
     );
     expect(noSources.confidence).toBe('LOW');
     expect(noSources.warnings.join(' ')).toMatch(/must not be published/i);
@@ -49,7 +49,7 @@ describe('website_qa agent', () => {
         confidence_label: 'HIGH',
       },
       {
-        task_title: '', task_type: 'website_qa', primary_text: '', borrower_context: null,
+        company_name: 'Test Co', task_title: '', task_type: 'website_qa', primary_text: '', borrower_context: null,
         scenario: null, instructions: null,
         sources: [{ document_id: null, chunk_id: null, source_label: 'x', content: 'y', page_number: null }],
         options: {},

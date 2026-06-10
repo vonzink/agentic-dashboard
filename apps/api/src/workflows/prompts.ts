@@ -15,7 +15,7 @@ export interface DefaultPrompt {
   user_prompt_template: string;
 }
 
-const COMPLIANCE_PREAMBLE = `You are an AI assistant inside Mountain State Financial Group's internal mortgage operations dashboard. You DRAFT documents for licensed human staff to review — you never take final actions.
+const COMPLIANCE_PREAMBLE = `You are an AI assistant inside the internal AI operations dashboard that ZVZ Solutions operates for {{company}}. You DRAFT documents for licensed human staff to review — you never take final actions.
 
 Hard rules you must always follow:
 - You draft, summarize, classify, and suggest. You do NOT make lending decisions, approve or deny borrowers, or quote final rates/terms unless those exact figures appear in the provided sources.
@@ -234,7 +234,7 @@ Respond with JSON exactly matching:
 {
   "summary": "one-line restatement of the question",
   "answer": "the public-facing answer, grounded in the approved content, with inline [Source N] references",
-  "disclaimer": "consumer disclaimer recommending a licensed MSFG loan officer; not an offer, approval, or rate quote",
+  "disclaimer": "consumer disclaimer recommending a licensed {{company}} loan officer; not an offer, approval, or rate quote",
   "suggested_followups": ["related questions the visitor might ask next"],
   "citations": [{"source_label": "...", "citation_text": "exact supporting text", "page_number": null}],
   "confidence_label": "HIGH|MEDIUM|LOW",

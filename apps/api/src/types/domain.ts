@@ -15,12 +15,21 @@ import type {
 } from './statuses';
 
 /** Timestamps are ISO-8601 strings at the API boundary. */
+export interface Company {
+  id: string;
+  name: string;
+  slug: string;
+  is_active: boolean;
+  created_at: string;
+}
+
 export interface Task {
   id: string;
   title: string;
   task_type: TaskType;
   status: TaskStatus;
   priority: TaskPriority;
+  company_id: string;
   created_by: string;
   assigned_to: string | null;
   borrower_reference: string | null;
@@ -87,6 +96,7 @@ export interface Approval {
 export interface AuditEvent {
   id: number;
   task_id: string | null;
+  company_id: string | null;
   actor_user_id: string | null;
   event_type: string;
   event_payload_json: Record<string, unknown>;
@@ -102,6 +112,7 @@ export interface SourceDocument {
   text_extraction_status: ExtractionStatus;
   document_type: DocumentType;
   classification: Classification;
+  company_id: string;
   created_by: string;
   metadata_json: Record<string, unknown>;
   created_at: string;

@@ -344,6 +344,22 @@ CREATE TRIGGER trg_ai_integration_actions_gate
 
 COMMIT;
 
+-- ---------------------------------------------------------------------------
+-- 13. ai_companies — client companies (ZVZ Solutions operates the platform;
+--     tasks/documents are owned by a company; retrieval never crosses
+--     companies). Added by migration 0003 together with:
+--       ai_tasks.company_id            uuid NOT NULL REFERENCES ai_companies
+--       ai_source_documents.company_id uuid NOT NULL REFERENCES ai_companies
+--       ai_audit_events.company_id     uuid NULL     REFERENCES ai_companies
+-- ---------------------------------------------------------------------------
+CREATE TABLE ai_companies (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name       text NOT NULL UNIQUE,
+  slug       text NOT NULL UNIQUE CHECK (slug ~ '^[a-z0-9][a-z0-9-]*$'),
+  is_active  boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
 -- ============================================================================
 -- Seed data (safe, non-borrower): default workflow configs + prompt v1 rows
 -- are inserted by "npm run db:seed" (src/db/seed.ts), not by migrations.

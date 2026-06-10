@@ -3,11 +3,13 @@ import type { Store, TaskFilter } from '../repositories/interfaces';
 import type { AuthUser, Task, TaskInput } from '../types/domain';
 import type { InputType } from '../types/statuses';
 import type { AuditService } from './audit';
+import type { CompanyService } from './companies';
 
 export class TaskService {
   constructor(
     private store: Store,
     private audit: AuditService,
+    private companies: CompanyService,
   ) {}
 
   async create(
@@ -16,6 +18,7 @@ export class TaskService {
       title: string;
       task_type: Task['task_type'];
       priority: Task['priority'];
+      company_id?: string | null;
       assigned_to?: string | null;
       borrower_reference?: string | null;
       loan_reference?: string | null;
@@ -23,11 +26,13 @@ export class TaskService {
       metadata_json: Record<string, unknown>;
     },
   ): Promise<Task> {
+    const company = await this.companies.resolve(body.company_id);
     const task = await this.store.tasks.create({
       title: body.title,
       task_type: body.task_type,
       status: 'open',
       priority: body.priority,
+      company_id: company.id,
       created_by: actor.email,
       assigned_to: body.assigned_to ?? null,
       borrower_reference: body.borrower_reference ?? null,
@@ -37,8 +42,14 @@ export class TaskService {
     });
     await this.audit.record('task.created', {
       taskId: task.id,
+      companyId: task.company_id,
       actor: actor.email,
-      payload: { title: task.title, task_type: task.task_type, priority: task.priority },
+      payload: {
+        title: task.title,
+        task_type: task.task_type,
+        priority: task.priority,
+        company: company.slug,
+      },
     });
     return task;
   }
@@ -77,6 +88,7 @@ export class TaskService {
     if (!updated) throw ApiError.notFound('Task');
     await this.audit.record('task.updated', {
       taskId: id,
+      companyId: updated.company_id,
       actor: actor.email,
       payload: { patch },
     });
@@ -88,7 +100,11 @@ export class TaskService {
     await this.get(id);
     const updated = await this.store.tasks.update(id, { status: 'archived' });
     if (!updated) throw ApiError.notFound('Task');
-    await this.audit.record('task.archived', { taskId: id, actor: actor.email });
+    await this.audit.record('task.archived', {
+      taskId: id,
+      companyId: updated.company_id,
+      actor: actor.email,
+    });
     return updated;
   }
 
@@ -108,8 +124,10 @@ export class TaskService {
       content: body.content,
       source_document_id: body.source_document_id ?? null,
     });
+    const task = await this.get(taskId);
     await this.audit.record('input.added', {
       taskId,
+      companyId: task.company_id,
       actor: actor.email,
       payload: { input_id: input.id, input_type: input.input_type },
     });

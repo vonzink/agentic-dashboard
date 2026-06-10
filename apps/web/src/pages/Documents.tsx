@@ -6,6 +6,7 @@ import type { Classification, DocumentDetail, DocumentType } from '../api/types'
 import { Badge } from '../components/Badge';
 import { Pager } from '../components/Pager';
 import { EmptyState, ErrorState, Loading } from '../components/States';
+import { activeCompanyId } from '../lib/company';
 import { fmtDate, titleCase } from '../lib/format';
 
 const DOC_TYPES: DocumentType[] = [
@@ -15,7 +16,7 @@ const DOC_TYPES: DocumentType[] = [
 
 function SearchPanel({ onSelect }: { onSelect: (documentId: string) => void }) {
   const [q, setQ] = useState('');
-  const search = useChunkSearch(q);
+  const search = useChunkSearch(q, 5, activeCompanyId() ?? undefined);
   return (
     <div className="panel">
       <h2>Search the library</h2>
@@ -69,9 +70,11 @@ function UploadForm({ onCreated }: { onCreated: (id: string) => void }) {
     setError(null);
     setResult('');
     try {
+      const company = activeCompanyId();
       const doc = await apiUpload<DocumentDetail>('/documents/upload', file, {
         document_type: docType,
         classification,
+        ...(company ? { company_id: company } : {}),
       });
       setResult(
         doc.text_extraction_status === 'succeeded'
@@ -138,6 +141,7 @@ function AddDocumentForm({ onCreated }: { onCreated: (id: string) => void }) {
           {
             filename: form.filename.trim(),
             document_type: form.document_type,
+            company_id: activeCompanyId() ?? undefined,
             classification: form.classification,
             content: form.content.trim() || undefined,
             s3_bucket: form.s3_bucket.trim() || undefined,
@@ -256,7 +260,7 @@ export function DocumentsPage() {
   const [page, setPage] = useState(1);
   const [docType, setDocType] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
-  const docs = useDocuments({ document_type: docType, page, pageSize: 20 });
+  const docs = useDocuments({ document_type: docType, company_id: activeCompanyId() ?? undefined, page, pageSize: 20 });
 
   return (
     <div>

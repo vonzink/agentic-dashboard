@@ -263,7 +263,7 @@ export const titleInsuranceReview = makeFileReviewAgent({
 });
 
 const PUBLIC_DISCLAIMER =
-  'This is general information, not a loan offer, approval, or rate quote. Rates and program availability change; please speak with a licensed MSFG loan officer for guidance specific to your situation.';
+  'This is general information, not a loan offer, approval, or rate quote. Rates and program availability change; please speak with a licensed loan officer for guidance specific to your situation.';
 
 /** Detects commitment-style wording a public answer must never contain. */
 const COMMITMENT_WORDING =

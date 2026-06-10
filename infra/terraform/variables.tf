@@ -22,8 +22,26 @@ variable "allowed_ingress_cidrs" {
   default     = ["0.0.0.0/0"]
 }
 
+variable "route53_zone_name" {
+  description = "Existing Route 53 hosted zone for the custom domain. Empty disables custom-domain resources."
+  type        = string
+  default     = "zvzsolutions.com"
+}
+
+variable "app_hostname" {
+  description = "Dashboard hostname (CloudFront alias) inside the zone"
+  type        = string
+  default     = "agentic.zvzsolutions.com"
+}
+
+variable "api_hostname" {
+  description = "API hostname (ALB alias; also CloudFront's /api/* origin) inside the zone"
+  type        = string
+  default     = "api.agentic.zvzsolutions.com"
+}
+
 variable "acm_certificate_arn" {
-  description = "ACM certificate ARN for the ALB HTTPS listener. Empty = HTTP-only bootstrap mode (dev only; never run prod without TLS)."
+  description = "Manual ACM cert ARN for the ALB when route53_zone_name is empty. Empty = HTTP-only bootstrap mode (dev only; never run prod without TLS)."
   type        = string
   default     = ""
 }

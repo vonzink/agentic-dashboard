@@ -54,14 +54,18 @@ export class RunService {
       throw ApiError.conflict('WORKFLOW_DISABLED', `Workflow '${workflowName}' is disabled`);
     }
 
+    const company = await this.store.companies.get(task.company_id);
     const input = await this.assembleInput(taskId, task.title, def.taskType, options);
+    input.company_name = company?.name ?? 'the client company';
 
     // RAG: merge top-k retrieved chunks into the sources. Retrieved
     // provenance lands in the run snapshot (chunk ids + scores), so every
     // citation remains traceable to what was retrieved and why.
     let retrievalMeta: Record<string, unknown> | null = null;
     if (options.retrieve) {
-      const hits = await this.retrieval.search(input.primary_text, 5);
+      // COMPLIANCE: retrieval is scoped to the task's company — another
+      // client's documents can never ground this answer.
+      const hits = await this.retrieval.search(input.primary_text, 5, task.company_id);
       for (const hit of hits) {
         if (input.sources.some((s) => s.chunk_id === hit.chunk_id)) continue;
         input.sources.push({
@@ -101,6 +105,7 @@ export class RunService {
     });
     await this.audit.record('run.requested', {
       taskId,
+      companyId: task.company_id,
       actor: actor.email,
       payload: {
         run_id: run.id,
@@ -163,6 +168,7 @@ export class RunService {
 
         await tx.audit.append({
           task_id: taskId,
+          company_id: task.company_id,
           actor_user_id: actor.email,
           event_type: 'run.completed',
           event_payload_json: {
@@ -177,6 +183,7 @@ export class RunService {
         });
         await tx.audit.append({
           task_id: taskId,
+          company_id: task.company_id,
           actor_user_id: actor.email,
           event_type: 'output.created',
           event_payload_json: { output_id: output.id, review_status: output.review_status },
@@ -202,6 +209,7 @@ export class RunService {
       });
       await this.audit.record('run.failed', {
         taskId,
+        companyId: task.company_id,
         actor: actor.email,
         payload: { run_id: run.id, error: message },
       });
@@ -271,6 +279,7 @@ export class RunService {
     }
 
     return {
+      company_name: '',
       task_title: taskTitle,
       task_type: taskType,
       primary_text:

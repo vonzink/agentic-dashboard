@@ -25,6 +25,14 @@ ai_workflow_configs (standalone; one row per workflow)
 
 ## How the entities work together
 
+0. The platform is multi-company (ZVZ Solutions operates it for client
+   companies; MSFG is the first). **ai_companies** owns **ai_tasks** and
+   **ai_source_documents** directly; everything else inherits — runs/
+   outputs/approvals/actions through the task, chunks/citations through
+   the document. Retrieval candidates are filtered by the task's company,
+   so one client's corpus can never ground another's answers. Companies
+   deactivate rather than delete (migration 0003).
+
 1. A user creates an **ai_task** (type, priority, optional borrower/loan
    *references* — opaque identifiers only, never PII payloads).
 2. Context is attached as **ai_task_inputs**: condition text, borrower

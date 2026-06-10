@@ -27,10 +27,10 @@ resource "aws_lb_target_group" "api" {
 # HTTPS when a cert is supplied; HTTP-only bootstrap otherwise (dev only).
 resource "aws_lb_listener" "main" {
   load_balancer_arn = aws_lb.main.arn
-  port              = var.acm_certificate_arn != "" ? 443 : 80
-  protocol          = var.acm_certificate_arn != "" ? "HTTPS" : "HTTP"
-  ssl_policy        = var.acm_certificate_arn != "" ? "ELBSecurityPolicy-TLS13-1-2-2021-06" : null
-  certificate_arn   = var.acm_certificate_arn != "" ? var.acm_certificate_arn : null
+  port              = local.alb_certificate_arn != "" ? 443 : 80
+  protocol          = local.alb_certificate_arn != "" ? "HTTPS" : "HTTP"
+  ssl_policy        = local.alb_certificate_arn != "" ? "ELBSecurityPolicy-TLS13-1-2-2021-06" : null
+  certificate_arn   = local.alb_certificate_arn != "" ? local.alb_certificate_arn : null
 
   default_action {
     type             = "forward"
@@ -40,7 +40,7 @@ resource "aws_lb_listener" "main" {
 
 # When TLS is on, bounce port 80 to 443.
 resource "aws_lb_listener" "http_redirect" {
-  count             = var.acm_certificate_arn != "" ? 1 : 0
+  count             = local.alb_certificate_arn != "" ? 1 : 0
   load_balancer_arn = aws_lb.main.arn
   port              = 80
   protocol          = "HTTP"

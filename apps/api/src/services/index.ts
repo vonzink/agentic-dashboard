@@ -5,6 +5,7 @@ import { mockOutputFor } from '../workflows/registry';
 import { ActionService } from './actions';
 import { ApprovalService } from './approvals';
 import { AuditService } from './audit';
+import { CompanyService } from './companies';
 import { DocumentService } from './documents';
 import { LocalHashEmbedder, type EmbeddingProvider } from './embeddings';
 import { PromptService } from './prompts';
@@ -15,6 +16,7 @@ import { TaskService } from './tasks';
 
 export interface Services {
   audit: AuditService;
+  companies: CompanyService;
   tasks: TaskService;
   documents: DocumentService;
   prompts: PromptService;
@@ -31,18 +33,19 @@ export interface Services {
 
 export function buildServices(store: Store, config: AppConfig, storage?: BlobStorage): Services {
   const audit = new AuditService(store);
-  const tasks = new TaskService(store, audit);
+  const companies = new CompanyService(store, audit);
+  const tasks = new TaskService(store, audit, companies);
   const blobStorage = storage ?? createStorage(config);
   const embedder = new LocalHashEmbedder();
   const retrieval = new RetrievalService(store, embedder);
-  const documents = new DocumentService(store, audit, blobStorage, embedder);
+  const documents = new DocumentService(store, audit, blobStorage, embedder, companies);
   const prompts = new PromptService(store, audit);
   const provider = createProvider(config, mockOutputFor);
   const runs = new RunService(store, audit, tasks, prompts, provider, config, retrieval);
   const approvals = new ApprovalService(store, audit, config);
   const actions = new ActionService(store, audit, config);
   return {
-    audit, tasks, documents, prompts, runs, approvals, actions,
+    audit, companies, tasks, documents, prompts, runs, approvals, actions,
     provider, storage: blobStorage, embedder, retrieval, store, config,
   };
 }

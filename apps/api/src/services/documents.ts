@@ -5,6 +5,7 @@ import type { Page, Store } from '../repositories/interfaces';
 import type { AuthUser, SourceChunk, SourceDocument } from '../types/domain';
 import type { Classification, DocumentType } from '../types/statuses';
 import type { AuditService } from './audit';
+import type { CompanyService } from './companies';
 import type { EmbeddingProvider } from './embeddings';
 import { chunkText, extractText } from './extraction';
 import type { BlobStorage } from './storage';
@@ -22,6 +23,7 @@ export class DocumentService {
     private audit: AuditService,
     private storage: BlobStorage,
     private embedder: EmbeddingProvider,
+    private companies: CompanyService,
   ) {}
 
   /** Embeds chunks so retrieval can find them; failures never block the
@@ -69,8 +71,9 @@ export class DocumentService {
   async upload(
     actor: AuthUser,
     file: UploadedFile,
-    opts: { document_type: DocumentType; classification: Classification },
+    opts: { document_type: DocumentType; classification: Classification; company_id?: string | null },
   ): Promise<SourceDocument & { chunks: SourceChunk[] }> {
+    const company = await this.companies.resolve(opts.company_id);
     const filename = basename(file.originalname).replace(/[^\w.\- ()]/g, '_') || 'upload';
     const key = `documents/${randomUUID()}/${filename}`;
     const stored = await this.storage.put(key, file.buffer, file.mimetype);
@@ -84,6 +87,7 @@ export class DocumentService {
       text_extraction_status: text ? 'succeeded' : 'pending',
       document_type: opts.document_type,
       classification: opts.classification,
+      company_id: company.id,
       created_by: actor.email,
       metadata_json: { storage: this.storage.kind, size_bytes: file.size },
     });
@@ -92,6 +96,7 @@ export class DocumentService {
 
     await this.audit.record('document.uploaded', {
       actor: actor.email,
+      companyId: company.id,
       payload: {
         document_id: doc.id,
         filename,
@@ -121,9 +126,11 @@ export class DocumentService {
       s3_bucket?: string | null;
       s3_key?: string | null;
       content?: string | null;
+      company_id?: string | null;
       metadata_json: Record<string, unknown>;
     },
   ): Promise<SourceDocument> {
+    const company = await this.companies.resolve(body.company_id);
     const isManual = !!body.content;
     const doc = await this.store.documents.create({
       filename: body.filename,
@@ -133,6 +140,7 @@ export class DocumentService {
       text_extraction_status: isManual ? 'manual' : body.s3_key ? 'pending' : 'not_applicable',
       document_type: body.document_type,
       classification: body.classification,
+      company_id: company.id,
       created_by: actor.email,
       metadata_json: body.metadata_json,
     });
@@ -149,6 +157,7 @@ export class DocumentService {
     }
     await this.audit.record('document.created', {
       actor: actor.email,
+      companyId: company.id,
       payload: {
         document_id: doc.id,
         filename: doc.filename,
@@ -213,7 +222,7 @@ export class DocumentService {
     return { ...doc, chunks };
   }
 
-  list(filter: Page & { document_type?: string }) {
+  list(filter: Page & { document_type?: string; company_id?: string }) {
     return this.store.documents.list(filter);
   }
 

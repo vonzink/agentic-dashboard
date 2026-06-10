@@ -69,6 +69,7 @@ export class ApprovalService {
 
     const run = await this.store.runs.get(output.task_run_id);
     if (!run) throw ApiError.notFound('Run for output');
+    const task = await this.store.tasks.get(run.task_id);
 
     if (this.config.requireDifferentReviewer && run.requested_by === actor.email) {
       throw ApiError.forbidden(
@@ -92,6 +93,7 @@ export class ApprovalService {
 
       await tx.audit.append({
         task_id: run.task_id,
+        company_id: task?.company_id ?? null,
         actor_user_id: actor.email,
         event_type: `output.${decision}`,
         event_payload_json: {
@@ -126,10 +128,12 @@ export class ApprovalService {
       );
     }
     const run = await this.store.runs.get(output.task_run_id);
+    const task = run ? await this.store.tasks.get(run.task_id) : null;
     return this.store.withTransaction(async (tx) => {
       const updated = (await tx.outputs.setReviewStatus(outputId, 'FINALIZED'))!;
       await tx.audit.append({
         task_id: run?.task_id ?? null,
+        company_id: task?.company_id ?? null,
         actor_user_id: actor.email,
         event_type: 'output.finalized',
         event_payload_json: {

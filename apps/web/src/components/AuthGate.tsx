@@ -34,8 +34,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ display: 'grid', placeItems: 'center', minHeight: '100vh', background: '#104547' }}>
       <div className="panel" style={{ width: 360, textAlign: 'center' }}>
-        <h2 style={{ marginTop: 0 }}>MSFG Agentic AI Dashboard</h2>
-        <p className="muted">Internal tool — sign in with your MSFG account.</p>
+        <h2 style={{ marginTop: 0 }}>ZVZ Solutions — Agentic AI Dashboard</h2>
+        <p className="muted">Internal tool — sign in with your work account.</p>
         {state === 'error' && <div className="banner error">{message}</div>}
         <button className="btn primary" onClick={() => void beginLogin()}>
           Sign in

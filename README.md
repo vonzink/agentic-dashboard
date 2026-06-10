@@ -1,7 +1,9 @@
-# MSFG Agentic AI Dashboard
+# ZVZ Solutions — Agentic AI Dashboard
 
-Internal, compliance-first AI operations dashboard for Mountain State
-Financial Group. AI **drafts** — condition responses, borrower emails,
+Internal, compliance-first AI operations dashboard operated by ZVZ
+Solutions for multiple client companies (Mountain State Financial Group is
+the first). Every task and document belongs to a company, and retrieval
+never crosses companies. AI **drafts** — condition responses, borrower emails,
 document checklists, SOP answers — and licensed humans **review, edit,
 approve, and act**. Every run, decision, and refusal is recorded in an
 append-only audit log.

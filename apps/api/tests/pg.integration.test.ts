@@ -28,7 +28,7 @@ describe.skipIf(!url)('Postgres integration', () => {
     // Clean slate (audit is delete-protected by trigger; disable just for test reset).
     await pool.query(`
       ALTER TABLE ai_audit_events DISABLE TRIGGER trg_ai_audit_events_append_only;
-      TRUNCATE ai_tasks, ai_audit_events, ai_source_documents,
+      TRUNCATE ai_tasks, ai_audit_events, ai_source_documents, ai_companies,
                ai_prompt_templates, ai_workflow_configs RESTART IDENTITY CASCADE;
       ALTER TABLE ai_audit_events ENABLE TRIGGER trg_ai_audit_events_append_only;
     `);
@@ -105,10 +105,11 @@ describe.skipIf(!url)('Postgres integration', () => {
   });
 
   it('database trigger refuses unapproved action execution even via raw SQL', async () => {
+    const company = (await store.companies.getBySlug('msfg'))!;
     const task = await store.tasks.create({
       title: 'trigger test', task_type: 'general', status: 'open', priority: 'normal',
-      created_by: 't@test.local', assigned_to: null, borrower_reference: null,
-      loan_reference: null, due_at: null, metadata_json: {},
+      company_id: company.id, created_by: 't@test.local', assigned_to: null,
+      borrower_reference: null, loan_reference: null, due_at: null, metadata_json: {},
     });
     await expect(
       pool.query(
@@ -121,7 +122,7 @@ describe.skipIf(!url)('Postgres integration', () => {
 
   it('database trigger keeps the audit log append-only even via raw SQL', async () => {
     await store.audit.append({
-      task_id: null, actor_user_id: 'trigger@test.local',
+      task_id: null, company_id: null, actor_user_id: 'trigger@test.local',
       event_type: 'integration.test', event_payload_json: {},
     });
     await expect(
@@ -136,10 +137,11 @@ describe.skipIf(!url)('Postgres integration', () => {
     const before = await pool.query(`SELECT count(*)::int AS n FROM ai_tasks`);
     await expect(
       store.withTransaction(async (tx) => {
+        const company = (await tx.companies.getBySlug('msfg'))!;
         await tx.tasks.create({
           title: 'will be rolled back', task_type: 'general', status: 'open', priority: 'normal',
-          created_by: 'tx@test.local', assigned_to: null, borrower_reference: null,
-          loan_reference: null, due_at: null, metadata_json: {},
+          company_id: company.id, created_by: 'tx@test.local', assigned_to: null,
+          borrower_reference: null, loan_reference: null, due_at: null, metadata_json: {},
         });
         throw new Error('boom');
       }),

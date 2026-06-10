@@ -1,3 +1,12 @@
+output "app_url" {
+  description = "Where staff sign in"
+  value       = local.domain_enabled ? "https://${var.app_hostname}" : "https://${aws_cloudfront_distribution.spa.domain_name}"
+}
+
+output "api_url" {
+  value = local.domain_enabled ? "https://${var.api_hostname}" : "http://${aws_lb.main.dns_name}"
+}
+
 output "alb_dns_name" {
   description = "API endpoint (put behind Route53/your DNS)"
   value       = aws_lb.main.dns_name

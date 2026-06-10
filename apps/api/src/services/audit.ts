@@ -13,12 +13,14 @@ export class AuditService {
     eventType: string,
     opts: {
       taskId?: string | null;
+      companyId?: string | null;
       actor?: string | null;
       payload?: Record<string, unknown>;
     } = {},
   ): Promise<AuditEvent> {
     return this.store.audit.append({
       task_id: opts.taskId ?? null,
+      company_id: opts.companyId ?? null,
       actor_user_id: opts.actor ?? null,
       event_type: eventType,
       event_payload_json: opts.payload ?? {},

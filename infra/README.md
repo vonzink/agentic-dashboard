@@ -67,12 +67,13 @@ aws cognito-idp admin-add-user-to-group --user-pool-id "$(terraform output -raw 
 Add the CloudFront URL to `cognito_callback_urls`/`cognito_logout_urls` in
 terraform.tfvars and re-apply once you know it.
 
-**Routing note:** the SPA calls `/api/ai/*` on its own origin. Either put
-CloudFront and the ALB behind one hostname (add the ALB as a second
-CloudFront origin with an `/api/*` behavior — recommended follow-up), or
-set the API hostname at build time. Until then, point DNS records
-`ai.yourdomain` → CloudFront and `api.ai.yourdomain` → ALB and bake the
-API base into the SPA build.
+**Custom domain (default: zvzsolutions.com).** With `route53_zone_name`
+set, terraform creates ACM certs (DNS-validated automatically), A-aliases
+for `app_hostname` → CloudFront and `api_hostname` → ALB, and a CloudFront
+`/api/*` behavior that forwards to the ALB — so the SPA and API share one
+origin (`https://agentic.zvzsolutions.com`) with no CORS and no API base
+URL to configure. Set `route53_zone_name = ""` to fall back to the bare
+CloudFront/ALB hostnames.
 
 ## Releases
 

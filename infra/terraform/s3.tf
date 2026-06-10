@@ -72,11 +72,28 @@ resource "aws_cloudfront_distribution" "spa" {
   default_root_object = "index.html"
   price_class         = "PriceClass_100"
   comment             = "${var.name_prefix} ${var.environment} SPA"
+  aliases             = local.domain_enabled ? [var.app_hostname] : []
 
   origin {
     domain_name              = aws_s3_bucket.spa.bucket_regional_domain_name
     origin_id                = "spa-s3"
     origin_access_control_id = aws_cloudfront_origin_access_control.spa.id
+  }
+
+  # Same-origin API: /api/* is forwarded to the ALB (its cert matches
+  # api_hostname), so the SPA needs no separate API base URL or CORS.
+  dynamic "origin" {
+    for_each = local.domain_enabled ? [1] : []
+    content {
+      domain_name = var.api_hostname
+      origin_id   = "api-alb"
+      custom_origin_config {
+        http_port              = 80
+        https_port             = 443
+        origin_protocol_policy = "https-only"
+        origin_ssl_protocols   = ["TLSv1.2"]
+      }
+    }
   }
 
   default_cache_behavior {
@@ -86,6 +103,21 @@ resource "aws_cloudfront_distribution" "spa" {
     cached_methods         = ["GET", "HEAD"]
     # AWS managed CachingOptimized policy
     cache_policy_id = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+  }
+
+  dynamic "ordered_cache_behavior" {
+    for_each = local.domain_enabled ? [1] : []
+    content {
+      path_pattern           = "/api/*"
+      target_origin_id       = "api-alb"
+      viewer_protocol_policy = "https-only"
+      allowed_methods        = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
+      cached_methods         = ["GET", "HEAD"]
+      # AWS managed CachingDisabled + AllViewerExceptHostHeader (forwards
+      # Authorization and all other viewer headers to the ALB).
+      cache_policy_id          = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
+      origin_request_policy_id = "b689b0a8-53d0-40ab-baf2-68738e2966ac"
+    }
   }
 
   # SPA routing: serve index.html for unknown paths.
@@ -108,7 +140,10 @@ resource "aws_cloudfront_distribution" "spa" {
   }
 
   viewer_certificate {
-    cloudfront_default_certificate = true
+    cloudfront_default_certificate = local.domain_enabled ? null : true
+    acm_certificate_arn            = local.domain_enabled ? aws_acm_certificate_validation.app[0].certificate_arn : null
+    ssl_support_method             = local.domain_enabled ? "sni-only" : null
+    minimum_protocol_version       = local.domain_enabled ? "TLSv1.2_2021" : null
   }
 }
 

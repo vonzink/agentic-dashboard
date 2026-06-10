@@ -37,6 +37,7 @@ export class ActionService {
   ): Promise<IntegrationAction> {
     const task = await this.store.tasks.get(taskId);
     if (!task) throw ApiError.notFound('Task');
+    const companyId = task.company_id;
     if (body.approval_id) {
       const approval = await this.store.approvals.get(body.approval_id);
       if (!approval) throw ApiError.badRequest('approval_id does not exist');
@@ -52,6 +53,7 @@ export class ActionService {
     });
     await this.audit.record('action.proposed', {
       taskId,
+      companyId,
       actor: actor.email,
       payload: {
         action_id: action.id,
@@ -87,9 +89,11 @@ export class ActionService {
       throw ApiError.conflict('ACTION_NOT_EXECUTABLE', `Action is ${action.status}`);
     }
 
+    const actionTask = await this.store.tasks.get(action.task_id);
     const block = async (code: string, message: string, status = 403) => {
       await this.audit.record('action.blocked', {
         taskId: action.task_id,
+        companyId: actionTask?.company_id ?? null,
         actor: actor.email,
         payload: { action_id: actionId, reason: code },
       });
@@ -152,6 +156,7 @@ export class ActionService {
       await tx.outputs.setReviewStatus(output!.id, 'ACTION_COMPLETED');
       await tx.audit.append({
         task_id: action.task_id,
+        company_id: actionTask?.company_id ?? null,
         actor_user_id: actor.email,
         event_type: 'action.executed',
         event_payload_json: {

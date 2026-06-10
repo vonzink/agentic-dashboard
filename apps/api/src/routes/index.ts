@@ -7,6 +7,7 @@ import {
   approveBody,
   createActionBody,
   createChunkBody,
+  createCompanyBody,
   createDocumentBody,
   createInputBody,
   createPromptBody,
@@ -20,6 +21,7 @@ import {
   listTasksQuery,
   rejectBody,
   searchQuery,
+  updateCompanyBody,
   updatePromptBody,
   updateTaskBody,
   usageQuery,
@@ -92,6 +94,21 @@ export function buildRouter(s: Services): Router {
         })),
       ],
     });
+  });
+
+  // ----- companies ----------------------------------------------------------
+  r.get('/companies', requireRole('viewer'), async (_req, res) => {
+    res.json({ items: await s.companies.list() });
+  });
+
+  r.post('/companies', requireRole('admin'), async (req, res) => {
+    const body = createCompanyBody.parse(req.body);
+    res.status(201).json(await s.companies.create(currentUser(req), body));
+  });
+
+  r.patch('/companies/:id', requireRole('admin'), async (req, res) => {
+    const body = updateCompanyBody.parse(req.body);
+    res.json(await s.companies.update(currentUser(req), param(req, 'id'), body));
   });
 
   // ----- tasks --------------------------------------------------------------
@@ -216,15 +233,15 @@ export function buildRouter(s: Services): Router {
 
   // ----- retrieval ---------------------------------------------------------------
   r.get('/search', requireRole('viewer'), async (req, res) => {
-    const { q, k } = searchQuery.parse(req.query);
-    res.json({ items: await s.retrieval.search(q, k), model: s.embedder.model });
+    const { q, k, company_id } = searchQuery.parse(req.query);
+    res.json({ items: await s.retrieval.search(q, k, company_id), model: s.embedder.model });
   });
 
   // ----- usage / cost reporting ----------------------------------------------------
   r.get('/usage', requireRole('viewer'), async (req, res) => {
-    const { days } = usageQuery.parse(req.query);
+    const { days, company_id } = usageQuery.parse(req.query);
     const since = new Date(Date.now() - days * 86_400_000).toISOString();
-    res.json({ days, ...(await s.store.runs.usageSummary(since)) });
+    res.json({ days, ...(await s.store.runs.usageSummary(since, company_id)) });
   });
 
   // ----- prompts (admin) ----------------------------------------------------------
