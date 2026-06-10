@@ -59,9 +59,19 @@ approve, admin for the Admin page).
 ## 4. Tests and checks
 
 ```bash
-cd apps/api && npm test          # 24 tests incl. compliance guardrails
+cd apps/api && npm test          # unit tests (in-memory store, mock provider)
 cd apps/api && npm run typecheck
 cd apps/web && npm run typecheck && npm run build
+
+# Postgres integration tests (migrations, triggers, transactions) — needs a DB:
+cd apps/api && TEST_DATABASE_URL=postgres://agentic:agentic_dev_password@localhost:5432/agentic_dashboard npm test
+```
+
+## Production build
+
+```bash
+cd apps/api && npm run build     # esbuild → dist/ (run with: node dist/index.js)
+docker build -t agentic-dashboard-api apps/api   # containerized API
 ```
 
 ## 5. Try the flow (curl)

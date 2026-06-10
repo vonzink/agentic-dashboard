@@ -11,7 +11,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:migrate": "tsx src/db/migrate.ts",
-    "db:seed": "tsx src/db/seed.ts"
+    "db:seed": "tsx src/db/seed.ts",
+    "build": "esbuild src/index.ts src/db/migrate.ts src/db/seed.ts --bundle --platform=node --target=node22 --format=esm --packages=external --outdir=dist",
+    "start:prod": "node dist/index.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
@@ -27,6 +29,7 @@
     "@types/node": "^25.9.2",
     "@types/pg": "^8.20.0",
     "@types/supertest": "^7.2.0",
+    "esbuild": "^0.28.0",
     "supertest": "^7.2.2",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",

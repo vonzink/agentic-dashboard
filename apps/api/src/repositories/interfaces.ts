@@ -160,6 +160,8 @@ export interface Store {
   actions: {
     create(a: NewIntegrationAction): Promise<IntegrationAction>;
     get(id: string): Promise<IntegrationAction | null>;
+    /** Like get(), but row-locked when called inside withTransaction (pg). */
+    getForUpdate(id: string): Promise<IntegrationAction | null>;
     update(
       id: string,
       patch: Partial<
@@ -172,6 +174,12 @@ export interface Store {
     list(filter: ActionFilter): Promise<Paginated<IntegrationAction>>;
     listByTask(taskId: string): Promise<IntegrationAction[]>;
   };
+  /**
+   * Runs `fn` atomically: PgStore wraps it in BEGIN/COMMIT on one client;
+   * MemoryStore runs it directly (single-threaded, no rollback). Services
+   * use this to couple compliance-critical writes with their audit events.
+   */
+  withTransaction<T>(fn: (s: Store) => Promise<T>): Promise<T>;
   /** Health probe. */
   ping(): Promise<'up' | 'down' | 'skipped'>;
 }

@@ -97,64 +97,70 @@ export class RunService {
               1_000_000
             ).toFixed(6);
 
-      const completedRun = await this.store.runs.update(run.id, {
-        status: 'succeeded',
-        completed_at: new Date().toISOString(),
-        langgraph_run_id: result.langgraphRunId,
-        token_input_count: result.tokens.input,
-        token_output_count: result.tokens.output,
-        estimated_cost: cost,
-      });
-
-      const requiresApproval = wfConfig?.requires_approval ?? true;
-      const output = await this.store.outputs.create({
-        task_run_id: run.id,
-        output_type: def.outputType,
-        content: result.mainContent,
-        structured_json: result.structured,
-        confidence_label: result.confidence,
-        requires_human_review: true, // invariant in MVP, regardless of config
-        review_status: requiresApproval ? 'NEEDS_REVIEW' : 'AI_GENERATED',
-      });
-
-      const citations = await this.store.citations.createMany(
-        result.citations.map((c) => {
-          const matched = input.sources.find((s) => s.source_label === c.source_label);
-          return {
-            output_id: output.id,
-            document_id: matched?.document_id ?? null,
-            chunk_id: matched?.chunk_id ?? null,
-            citation_text: c.citation_text,
-            source_label: c.source_label,
-            page_number: c.page_number ?? null,
-          };
-        }),
-      );
-
-      await this.audit.record('run.completed', {
-        taskId,
-        actor: actor.email,
-        payload: {
-          run_id: run.id,
-          output_id: output.id,
-          confidence: result.confidence,
-          warnings: result.warnings,
-          citation_count: citations.length,
-          tokens: result.tokens,
+      // Persist run result + output + citations + audit atomically. The model
+      // call itself happens above, outside any transaction.
+      return await this.store.withTransaction(async (tx) => {
+        const completedRun = await tx.runs.update(run.id, {
+          status: 'succeeded',
+          completed_at: new Date().toISOString(),
+          langgraph_run_id: result.langgraphRunId,
+          token_input_count: result.tokens.input,
+          token_output_count: result.tokens.output,
           estimated_cost: cost,
-        },
-      });
-      await this.audit.record('output.created', {
-        taskId,
-        actor: actor.email,
-        payload: { output_id: output.id, review_status: output.review_status },
-      });
+        });
 
-      if (task.status === 'open' || task.status === 'in_progress') {
-        await this.store.tasks.update(taskId, { status: 'waiting_review' });
-      }
+        const requiresApproval = wfConfig?.requires_approval ?? true;
+        const output = await tx.outputs.create({
+          task_run_id: run.id,
+          output_type: def.outputType,
+          content: result.mainContent,
+          structured_json: result.structured,
+          confidence_label: result.confidence,
+          requires_human_review: true, // invariant in MVP, regardless of config
+          review_status: requiresApproval ? 'NEEDS_REVIEW' : 'AI_GENERATED',
+        });
 
-      return { run: completedRun!, outputs: [{ ...output, citations }] };
+        const citations = await tx.citations.createMany(
+          result.citations.map((c) => {
+            const matched = input.sources.find((s) => s.source_label === c.source_label);
+            return {
+              output_id: output.id,
+              document_id: matched?.document_id ?? null,
+              chunk_id: matched?.chunk_id ?? null,
+              citation_text: c.citation_text,
+              source_label: c.source_label,
+              page_number: c.page_number ?? null,
+            };
+          }),
+        );
+
+        await tx.audit.append({
+          task_id: taskId,
+          actor_user_id: actor.email,
+          event_type: 'run.completed',
+          event_payload_json: {
+            run_id: run.id,
+            output_id: output.id,
+            confidence: result.confidence,
+            warnings: result.warnings,
+            citation_count: citations.length,
+            tokens: result.tokens,
+            estimated_cost: cost,
+          },
+        });
+        await tx.audit.append({
+          task_id: taskId,
+          actor_user_id: actor.email,
+          event_type: 'output.created',
+          event_payload_json: { output_id: output.id, review_status: output.review_status },
+        });
+
+        if (task.status === 'open' || task.status === 'in_progress') {
+          await tx.tasks.update(taskId, { status: 'waiting_review' });
+        }
+
+        return { run: completedRun!, outputs: [{ ...output, citations }] };
+      });
     } catch (err) {
       const message =
         err instanceof WorkflowOutputError

@@ -331,6 +331,7 @@ export class MemoryStore implements Store {
       return row;
     },
     get: async (id: string) => this.actionsById.get(id) ?? null,
+    getForUpdate: async (id: string) => this.actionsById.get(id) ?? null,
     update: async (id: string, patch: Partial<IntegrationAction>) => {
       const existing = this.actionsById.get(id);
       if (!existing) return null;
@@ -347,6 +348,12 @@ export class MemoryStore implements Store {
     listByTask: async (taskId: string) =>
       [...this.actionsById.values()].filter((a) => a.task_id === taskId).sort(byCreatedDesc),
   };
+
+  /** No real transactionality in memory: JS is single-threaded and tests
+   * don't need rollback, only the same call shape as PgStore. */
+  async withTransaction<T>(fn: (s: Store) => Promise<T>): Promise<T> {
+    return fn(this);
+  }
 
   async ping(): Promise<'up' | 'down' | 'skipped'> {
     return 'skipped';

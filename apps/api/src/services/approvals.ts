@@ -77,34 +77,38 @@ export class ApprovalService {
       );
     }
 
-    const approval = await this.store.approvals.create({
-      task_id: run.task_id,
-      output_id: outputId,
-      reviewed_by: actor.email,
-      decision,
-      reviewer_notes: body.reviewer_notes ?? null,
-      // Stored separately from the raw AI output, by design.
-      edited_final_content: body.edited_final_content ?? null,
-    });
-    const updated = (await this.store.outputs.setReviewStatus(outputId, targetStatus))!;
-
-    await this.audit.record(`output.${decision}`, {
-      taskId: run.task_id,
-      actor: actor.email,
-      payload: {
+    // Decision + status change + audit event commit or roll back together.
+    return this.store.withTransaction(async (tx) => {
+      const approval = await tx.approvals.create({
+        task_id: run.task_id,
         output_id: outputId,
-        approval_id: approval.id,
-        run_id: run.id,
-        prompt_version: run.prompt_version,
-        was_edited: body.edited_final_content != null,
+        reviewed_by: actor.email,
+        decision,
         reviewer_notes: body.reviewer_notes ?? null,
-      },
-    });
+        // Stored separately from the raw AI output, by design.
+        edited_final_content: body.edited_final_content ?? null,
+      });
+      const updated = (await tx.outputs.setReviewStatus(outputId, targetStatus))!;
 
-    if (decision === 'changes_requested') {
-      await this.store.tasks.update(run.task_id, { status: 'changes_requested' });
-    }
-    return { approval, output: updated };
+      await tx.audit.append({
+        task_id: run.task_id,
+        actor_user_id: actor.email,
+        event_type: `output.${decision}`,
+        event_payload_json: {
+          output_id: outputId,
+          approval_id: approval.id,
+          run_id: run.id,
+          prompt_version: run.prompt_version,
+          was_edited: body.edited_final_content != null,
+          reviewer_notes: body.reviewer_notes ?? null,
+        },
+      });
+
+      if (decision === 'changes_requested') {
+        await tx.tasks.update(run.task_id, { status: 'changes_requested' });
+      }
+      return { approval, output: updated };
+    });
   }
 
   /** Locks the final content. Requires an approved approval on the output. */
@@ -122,18 +126,21 @@ export class ApprovalService {
       );
     }
     const run = await this.store.runs.get(output.task_run_id);
-    const updated = (await this.store.outputs.setReviewStatus(outputId, 'FINALIZED'))!;
-    await this.audit.record('output.finalized', {
-      taskId: run?.task_id ?? null,
-      actor: actor.email,
-      payload: {
-        output_id: outputId,
-        approval_id: latest.id,
-        final_content_source: latest.edited_final_content != null ? 'edited' : 'raw_output',
-      },
+    return this.store.withTransaction(async (tx) => {
+      const updated = (await tx.outputs.setReviewStatus(outputId, 'FINALIZED'))!;
+      await tx.audit.append({
+        task_id: run?.task_id ?? null,
+        actor_user_id: actor.email,
+        event_type: 'output.finalized',
+        event_payload_json: {
+          output_id: outputId,
+          approval_id: latest.id,
+          final_content_source: latest.edited_final_content != null ? 'edited' : 'raw_output',
+        },
+      });
+      if (run) await tx.tasks.update(run.task_id, { status: 'completed' });
+      return { output: updated };
     });
-    if (run) await this.store.tasks.update(run.task_id, { status: 'completed' });
-    return { output: updated };
   }
 
   private assertTransition(from: ReviewStatus, to: ReviewStatus) {

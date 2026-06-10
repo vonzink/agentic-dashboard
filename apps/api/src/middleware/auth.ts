@@ -37,7 +37,8 @@ export function authMiddleware(config: AppConfig): RequestHandler {
     }
 
     const email = (req.header('x-user-email') ?? 'dev@msfg.local').trim().toLowerCase();
-    const roleHeader = (req.header('x-user-role') ?? 'operator').trim().toLowerCase();
+    // Least privilege: requests that don't state a role get read-only access.
+    const roleHeader = (req.header('x-user-role') ?? 'viewer').trim().toLowerCase();
     if (!(ROLES as readonly string[]).includes(roleHeader)) {
       next(ApiError.badRequest(`x-user-role must be one of: ${ROLES.join(', ')}`));
       return;

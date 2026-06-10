@@ -131,25 +131,37 @@ export class ActionService {
       );
     }
 
-    // Gate passed: simulate the no-op adapter.
-    await this.store.actions.update(actionId, { status: 'executing' });
-    await this.store.outputs.setReviewStatus(output!.id, 'ACTION_SENT');
-    const executed = (await this.store.actions.update(actionId, {
-      status: 'executed',
-      response_payload_json: { simulated: true, executed_by: actor.email },
-      completed_at: new Date().toISOString(),
-    }))!;
-    await this.store.outputs.setReviewStatus(output!.id, 'ACTION_COMPLETED');
-    await this.audit.record('action.executed', {
-      taskId: action.task_id,
-      actor: actor.email,
-      payload: {
-        action_id: actionId,
-        approval_id: action.approval_id,
-        target_system: action.target_system,
-        simulated: true,
-      },
+    // Gate passed: atomically claim the row (FOR UPDATE serializes concurrent
+    // execute calls) and run the simulated no-op adapter. Everything in here
+    // commits or rolls back together.
+    return this.store.withTransaction(async (tx) => {
+      const locked = await tx.actions.getForUpdate(actionId);
+      if (!locked || (locked.status !== 'proposed' && locked.status !== 'approved')) {
+        throw ApiError.conflict(
+          'ACTION_ALREADY_EXECUTED',
+          `Action was already ${locked?.status ?? 'removed'} by another request`,
+        );
+      }
+      await tx.actions.update(actionId, { status: 'executing' });
+      await tx.outputs.setReviewStatus(output!.id, 'ACTION_SENT');
+      const executed = (await tx.actions.update(actionId, {
+        status: 'executed',
+        response_payload_json: { simulated: true, executed_by: actor.email },
+        completed_at: new Date().toISOString(),
+      }))!;
+      await tx.outputs.setReviewStatus(output!.id, 'ACTION_COMPLETED');
+      await tx.audit.append({
+        task_id: action.task_id,
+        actor_user_id: actor.email,
+        event_type: 'action.executed',
+        event_payload_json: {
+          action_id: actionId,
+          approval_id: action.approval_id,
+          target_system: action.target_system,
+          simulated: true,
+        },
+      });
+      return executed;
     });
-    return executed;
   }
 }

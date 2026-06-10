@@ -72,6 +72,10 @@ Rendered on **every** AI output, unconditionally:
 4. **Append-only audit** — `ai_audit_events` rejects UPDATE/DELETE via
    trigger; the repository layer exposes only `append`; approval,
    rejection, finalization, and every action transition write events.
+   Decisions, finalization, run persistence, and action execution couple
+   the state change and its audit event in one DB transaction
+   (`Store.withTransaction`); execution also takes a `FOR UPDATE` row
+   lock so a double-click or concurrent request cannot double-send.
 5. **Provenance** — every run logs user, timestamps, workflow,
    provider/model, `prompt_version`, the full input snapshot (including
    retrieved sources), tokens, and cost.
@@ -93,8 +97,10 @@ Rendered on **every** AI output, unconditionally:
 | (extra) Approval alone is not enough | guardrails: `OUTPUT_NOT_FINALIZED` |
 | (extra) Global kill-switch | guardrails: 409 `EXECUTION_DISABLED` |
 | (extra) Role enforcement | approvals + guardrails: 403 `INSUFFICIENT_ROLE` |
+| (extra) DB triggers hold under raw SQL; double-execute refused; tx rollback | pg.integration (real Postgres, run in CI) |
 
-Run them: `cd apps/api && npm test`.
+Run them: `cd apps/api && npm test` (set `TEST_DATABASE_URL` to include the
+Postgres integration suite; CI always runs it).
 
 ## 8. Data rules
 
