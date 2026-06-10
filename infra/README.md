@@ -1,4 +1,18 @@
-# Infrastructure (Terraform)
+# Infrastructure
+
+Two deployment tracks — pick one:
+
+| Track | Where it runs | New AWS spend | Use when |
+|---|---|---|---|
+| [**ec2/**](ec2/README.md) | Docker on an EC2 box you already have (API + Postgres + Caddy TLS) | **≈ $0/mo** | cheapest start, solo-operator pilot |
+| **terraform/** (below) | Managed: Fargate + ALB + RDS + CloudFront | ~$50–70/mo | team depends on it daily; managed backups/HA |
+
+Both serve the same containers with the same compliance guarantees; moving
+from ec2 → managed later is a dump/restore plus `terraform apply`.
+
+---
+
+# Managed track (infra/terraform)
 
 Provisions everything in docs/AGENTIC_DASHBOARD_AWS_DEPLOYMENT.md: VPC,
 ALB + ECS Fargate API, RDS Postgres 16, private documents bucket,

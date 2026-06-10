@@ -1,0 +1,14 @@
+# Copy to terraform.tfvars. No secrets belong in this file.
+
+aws_region  = "us-east-1"
+environment = "prod"
+
+route53_zone_name = "zvzsolutions.com"
+app_hostname      = "agentic.zvzsolutions.com"
+
+# Your existing server (must have a STATIC public IP — allocate + associate
+# an Elastic IP if this can change on stop/start; EIPs attached to a running
+# instance are free).
+ec2_public_ip = "52.203.186.217"
+
+cognito_domain_prefix = "zvz-agentic" # must be globally unique

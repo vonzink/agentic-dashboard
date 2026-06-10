@@ -1,0 +1,19 @@
+# Caddy fronts everything on one hostname: automatic Let's Encrypt TLS,
+# /api/* to the API container, everything else is the SPA.
+{
+	email {$ACME_EMAIL}
+}
+
+{$APP_HOSTNAME} {
+	encode gzip
+
+	handle /api/* {
+		reverse_proxy api:4000
+	}
+
+	handle {
+		root * /srv/spa
+		try_files {path} /index.html
+		file_server
+	}
+}
