@@ -1,80 +1,79 @@
 # EC2 deployment (cheapest track)
 
-Runs the whole stack — API, Postgres, and Caddy (automatic Let's Encrypt
-TLS) — in Docker on an EC2 box you already pay for. AWS adds only DNS,
-Cognito (free), and an optional S3 bucket: **≈ $0/mo of new spend**.
-A t3a.medium (2 vCPU / 4 GB) is more than enough.
+Runs the stack — API + Postgres in Docker — on an EC2 box you already pay
+for. AWS adds only DNS, Cognito (free), and an optional S3 bucket:
+**≈ $0/mo of new spend**. A t3a.medium (2 vCPU / 4 GB) is plenty.
+
+Two front-door modes (check with `sudo ss -tlnp '( sport = :80 or sport = :443 )'`):
+
+- **Mode A — host nginx already owns 80/443** (typical when the box
+  serves an existing website): nginx serves the SPA and proxies
+  `/api/` → the API container on `127.0.0.1:4000`; certbot adds TLS.
+- **Mode B — ports free:** the bundled Caddy container does TLS + SPA +
+  proxy (`--profile caddy`).
 
 ```
-Browser ── https://agentic.zvzsolutions.com ──▶ Caddy (TLS, :443)
-                                                 ├── /api/* ──▶ api container :4000
-                                                 └── /*     ──▶ SPA static files
-                                                 api ──▶ postgres container (not exposed)
+Mode A:  Browser ── https://agentic.zvzsolutions.com ──▶ host nginx (TLS)
+                                                          ├── /api/ ──▶ 127.0.0.1:4000 (api container)
+                                                          └── /*    ──▶ /var/www/agentic (SPA files)
+                          api container ──▶ postgres container (never exposed)
 ```
 
-One hostname, one cert, no ALB/Fargate/RDS. Same container, same approval
-gates, same audit trail as the managed track.
+Same containers, approval gates, and audit trail as the managed track
+(`infra/terraform`). Requires terraform >= 1.5 locally.
 
-## 0. Pre-flight (once, on the box)
-
-```bash
-ssh -i <your-key.pem> ubuntu@<EC2_IP>
-
-# Docker present?
-docker --version || (curl -fsSL https://get.docker.com | sudo sh && sudo usermod -aG docker ubuntu && exit)
-# (log out/in after usermod so 'ubuntu' can run docker)
-
-# Are ports 80/443 free? MUST print nothing:
-sudo ss -tlnp '( sport = :80 or sport = :443 )'
-```
-
-**If 80/443 are taken** (an existing nginx/apache site lives here), don't
-fight it — two options: (a) terminate TLS in the existing nginx instead of
-Caddy: proxy `agentic.zvzsolutions.com` → `127.0.0.1:8443`, change the
-caddy ports in docker-compose.yml to `"8080:80"`/`"8443:443"`, and use
-certbot on the host nginx; or (b) put the dashboard on a different small
-instance. Ask before improvising — TLS routing mistakes look like login
-bugs.
-
-**EC2 security group:** inbound 80 + 443 from 0.0.0.0/0 (Let's Encrypt
-needs 80), SSH restricted to your IP. **Static IP:** if the box doesn't
-have an Elastic IP, allocate + associate one (free while attached) so DNS
-doesn't break on a stop/start.
-
-## 1. AWS pieces (from your laptop)
+## 1. AWS pieces (laptop, ~2 min)
 
 ```bash
 cd infra/ec2/terraform
 cp terraform.tfvars.example terraform.tfvars   # confirm ec2_public_ip
 terraform init && terraform plan && terraform apply
-terraform output                               # keep these handy
+terraform output                               # keep these values handy
 ```
 
-Creates: the `agentic.zvzsolutions.com` A record → your box, the Cognito
-pool/client/groups, and (optional) the documents/backups bucket + an IAM
-policy you can attach to the instance role.
+Creates the `agentic.zvzsolutions.com` A record → your box, the Cognito
+pool/client/groups, and (optional) a documents/backups bucket + IAM policy.
 
-## 2. On the box
+> Confirm the box has an **Elastic IP** (EC2 console → Elastic IPs). The
+> auto-assigned public IP changes on stop/start and would break this record.
+
+## 2. On the box — containers
 
 ```bash
 git clone https://github.com/vonzink/agentic-dashboard.git
 cd agentic-dashboard/infra/ec2
 cp .env.example .env
 nano .env       # POSTGRES_PASSWORD (openssl rand -hex 24), ACME_EMAIL,
-                # the three (tf) cognito values, and your LLM key + MODEL_PROVIDER
+                # the four (tf) cognito values, LLM key + MODEL_PROVIDER
 
-docker compose --env-file .env up -d --build postgres api
+docker compose --env-file .env up -d --build      # postgres + api (Mode A)
 docker compose run --rm api node dist/db/migrate.js
 docker compose run --rm api node dist/db/seed.js
-
-./build-spa.sh                                  # builds SPA into ./spa
-docker compose --env-file .env up -d            # starts caddy (gets the cert)
+curl -s http://127.0.0.1:4000/api/ai/health        # expect {"status":"ok",...}
 ```
 
-DNS + cert need the A record live (step 1) — give it a few minutes, then
-`https://agentic.zvzsolutions.com` should answer.
+(Mode B instead: append `--profile caddy` to the `up` command and skip §3.)
 
-## 3. Users (from your laptop)
+## 3. On the box — nginx front door (Mode A)
+
+```bash
+./build-spa.sh                                     # SPA → ./spa (containerized build)
+sudo mkdir -p /var/www/agentic
+sudo rsync -a --delete spa/ /var/www/agentic/
+
+sudo cp nginx-agentic.conf /etc/nginx/sites-available/agentic.zvzsolutions.com
+sudo ln -s /etc/nginx/sites-available/agentic.zvzsolutions.com /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+
+# TLS (after the DNS record from §1 has propagated — a few minutes):
+sudo apt install -y certbot python3-certbot-nginx   # if not present
+sudo certbot --nginx -d agentic.zvzsolutions.com
+```
+
+Your existing MSFG site is untouched — this is a separate `server_name`
+vhost. `https://agentic.zvzsolutions.com` should now answer.
+
+## 4. Users (laptop)
 
 ```bash
 POOL=$(cd infra/ec2/terraform && terraform output -raw cognito_user_pool_id)
@@ -85,7 +84,7 @@ aws cognito-idp admin-add-user-to-group --user-pool-id "$POOL" \
 # repeat per staff member with operator / reviewer / viewer
 ```
 
-## 4. Backups (do not skip — the audit trail lives on this box)
+## 5. Backups (do not skip — the audit trail lives on this box)
 
 ```bash
 crontab -e
@@ -102,9 +101,10 @@ also copies to S3 with a 30-day lifecycle. Restore:
 ```bash
 cd ~/agentic-dashboard && git pull
 cd infra/ec2
-docker compose --env-file .env up -d --build api   # rebuild + restart API
+docker compose --env-file .env up -d --build api
 docker compose run --rm api node dist/db/migrate.js
-./build-spa.sh                                      # only when the UI changed
+# UI changed? rebuild + redeploy the SPA:
+./build-spa.sh && sudo rsync -a --delete spa/ /var/www/agentic/
 ```
 
 ## Ops crib sheet
@@ -112,7 +112,7 @@ docker compose run --rm api node dist/db/migrate.js
 ```bash
 docker compose ps                      # status
 docker compose logs -f api             # structured JSON logs (request ids)
-docker compose restart caddy           # after editing Caddyfile / spa
+sudo tail -f /var/log/nginx/access.log # front-door traffic
 docker compose down                    # stop (volumes/data persist)
 ```
 
@@ -120,7 +120,6 @@ docker compose down                    # stop (volumes/data persist)
 
 You're accepting: single box (host down = dashboard down), self-managed
 Postgres (cron backups instead of RDS point-in-time recovery), and OS/
-Docker patching is on you (`sudo apt update && sudo apt upgrade`,
-`docker compose pull`). For a solo-operator pilot that's reasonable; when
-MSFG staff depend on it daily, the managed track is one `terraform apply`
-away and the database moves with one dump/restore.
+Docker/nginx patching is on you. Reasonable for a solo-operator pilot;
+when MSFG staff depend on it daily, the managed track is one
+`terraform apply` away and the database moves with one dump/restore.

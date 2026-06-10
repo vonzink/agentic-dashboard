@@ -1,7 +1,15 @@
-# Cheapest deployment: API + Postgres + Caddy (auto-TLS) on one EC2 box.
-# Run from this directory:  docker compose --env-file .env up -d --build
-# Migrations:               docker compose run --rm api node dist/db/migrate.js
-# Seeds:                    docker compose run --rm api node dist/db/seed.js
+# Cheapest deployment: API + Postgres on one EC2 box, in Docker.
+#
+# Two front-door modes:
+#   A) EXISTING NGINX on the host (your case if :80/:443 are taken):
+#        docker compose --env-file .env up -d
+#      nginx serves the SPA and proxies /api/ -> 127.0.0.1:4000
+#      (vhost template: nginx-agentic.conf; TLS via certbot)
+#   B) PORTS FREE — bundled Caddy does TLS + SPA + proxy:
+#        docker compose --env-file .env --profile caddy up -d
+#
+# Migrations:  docker compose run --rm api node dist/db/migrate.js
+# Seeds:       docker compose run --rm api node dist/db/seed.js
 services:
   postgres:
     image: postgres:16-alpine
@@ -28,6 +36,8 @@ services:
       DATABASE_URL: postgres://agentic:${POSTGRES_PASSWORD}@postgres:5432/agentic_dashboard
       PORT: "4000"
       UPLOAD_DIR: /data/uploads
+    ports:
+      - "127.0.0.1:4000:4000" # loopback only — host nginx proxies to it; never internet-exposed
     volumes:
       - uploads:/data/uploads
     depends_on:
@@ -38,13 +48,14 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-    # Not exposed directly — Caddy fronts it with TLS.
 
+  # Mode B only (ports 80/443 free): start with --profile caddy
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    profiles: ["caddy"]
     ports:
-      - "80:80"   # must be free on the box (see README if nginx/apache owns them)
+      - "80:80"
       - "443:443"
     environment:
       APP_HOSTNAME: ${APP_HOSTNAME:?set in .env}
