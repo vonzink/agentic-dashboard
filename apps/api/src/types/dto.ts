@@ -24,6 +24,7 @@ export const createTaskBody = z.object({
   title: z.string().min(1).max(300),
   task_type: z.enum(TASK_TYPES),
   company_id: z.uuid().nullish(),
+  project_id: z.uuid().nullish(),
   priority: z.enum(TASK_PRIORITIES).default('normal'),
   assigned_to: z.string().email().nullish(),
   // References are opaque identifiers only. Never put borrower PII here.
@@ -47,6 +48,7 @@ export const updateTaskBody = z
 
 export const listTasksQuery = paginationQuery.extend({
   company_id: z.uuid().optional(),
+  project_id: z.uuid().optional(),
   status: z.enum(TASK_STATUSES).optional(),
   task_type: z.enum(TASK_TYPES).optional(),
   priority: z.enum(TASK_PRIORITIES).optional(),
@@ -107,6 +109,34 @@ export const updateCompanyBody = z
   .refine((b) => Object.keys(b).length > 0, { message: 'empty patch' });
 
 export const budgetQuery = z.object({ company_id: z.uuid().optional() });
+
+/** Projects registry. github_repo is 'owner/name' — repos stay private. */
+const githubRepo = z
+  .string()
+  .regex(/^[\w.-]+\/[\w.-]+$/, "expected 'owner/name', e.g. vonzink/msfg-calc");
+
+export const createProjectBody = z.object({
+  name: z.string().min(1).max(200),
+  company_id: z.uuid().nullish(),
+  description: z.string().max(2_000).nullish(),
+  github_repo: githubRepo.nullish(),
+  live_url: z.url().max(500).nullish(),
+  notes: z.string().max(10_000).nullish(),
+});
+
+export const updateProjectBody = z
+  .object({
+    name: z.string().min(1).max(200),
+    description: z.string().max(2_000).nullable(),
+    github_repo: githubRepo.nullable(),
+    live_url: z.url().max(500).nullable(),
+    status: z.enum(['active', 'paused', 'archived']),
+    notes: z.string().max(10_000).nullable(),
+  })
+  .partial()
+  .refine((b) => Object.keys(b).length > 0, { message: 'empty patch' });
+
+export const listProjectsQuery = z.object({ company_id: z.uuid().optional() });
 
 /** Eval sets: cases are synthetic test inputs — never borrower data. */
 export const createEvalCaseBody = z.object({

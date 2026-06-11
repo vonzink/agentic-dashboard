@@ -8,6 +8,7 @@ import type {
   EvalRun,
   IntegrationAction,
   Paginated,
+  Project,
   PromptTemplate,
   SourceChunk,
   SourceDocument,
@@ -33,6 +34,7 @@ export interface Page {
 
 export interface TaskFilter extends Page {
   company_id?: string;
+  project_id?: string;
   status?: TaskStatus;
   task_type?: TaskType;
   priority?: TaskPriority;
@@ -69,6 +71,22 @@ export type NewPromptTemplate = Omit<PromptTemplate, 'id' | 'created_at'>;
 export type NewWorkflowConfig = Omit<WorkflowConfig, 'id' | 'created_at' | 'updated_at'>;
 export type NewIntegrationAction = Omit<IntegrationAction, 'id' | 'created_at' | 'completed_at'>;
 export type NewEvalCase = Omit<EvalCase, 'id' | 'created_at'>;
+export type NewProject = Omit<Project, 'id' | 'created_at' | 'updated_at'>;
+export type ProjectPatch = Partial<
+  Pick<
+    Project,
+    | 'name'
+    | 'description'
+    | 'github_repo'
+    | 'live_url'
+    | 'status'
+    | 'notes'
+    | 'github_meta_json'
+    | 'github_synced_at'
+    | 'github_readme_sha'
+    | 'readme_document_id'
+  >
+>;
 export type NewEvalRun = Omit<EvalRun, 'id' | 'created_at'>;
 
 /** Aggregated AI usage/cost figures (PRD: AI cost monitoring). */
@@ -242,6 +260,12 @@ export interface Store {
     ): Promise<IntegrationAction | null>;
     list(filter: ActionFilter): Promise<Paginated<IntegrationAction>>;
     listByTask(taskId: string): Promise<IntegrationAction[]>;
+  };
+  projects: {
+    create(p: NewProject): Promise<Project>;
+    get(id: string): Promise<Project | null>;
+    list(companyId?: string): Promise<Project[]>;
+    update(id: string, patch: ProjectPatch): Promise<Project | null>;
   };
   evalCases: {
     create(c: NewEvalCase): Promise<EvalCase>;

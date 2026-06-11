@@ -9,6 +9,7 @@ import type {
   EvalRun,
   IntegrationAction,
   Paginated,
+  Project,
   PromptTemplate,
   SourceChunk,
   SourceDocument,
@@ -29,6 +30,7 @@ import type {
   NewEvalCase,
   NewEvalRun,
   NewIntegrationAction,
+  NewProject,
   NewPromptTemplate,
   NewSourceChunk,
   NewSourceDocument,
@@ -37,6 +39,7 @@ import type {
   NewTaskRun,
   NewWorkflowConfig,
   OutputFilter,
+  ProjectPatch,
   OutputListItem,
   Page,
   Store,
@@ -80,6 +83,7 @@ export class MemoryStore implements Store {
   private configsByName = new Map<string, WorkflowConfig>();
   private actionsById = new Map<string, IntegrationAction>();
   private evalCasesById = new Map<string, EvalCase>();
+  private projectsById = new Map<string, Project>();
   private evalRunsById = new Map<string, EvalRun>();
 
   companies = {
@@ -125,6 +129,7 @@ export class MemoryStore implements Store {
         .filter(
           (t) =>
             (!filter.company_id || t.company_id === filter.company_id) &&
+            (!filter.project_id || t.project_id === filter.project_id) &&
             (!filter.status || t.status === filter.status) &&
             (!filter.task_type || t.task_type === filter.task_type) &&
             (!filter.priority || t.priority === filter.priority) &&
@@ -491,6 +496,33 @@ export class MemoryStore implements Store {
 
   /** No real transactionality in memory: JS is single-threaded and tests
    * don't need rollback, only the same call shape as PgStore. */
+  projects = {
+    create: async (p: NewProject): Promise<Project> => {
+      if (
+        [...this.projectsById.values()].some(
+          (x) => x.company_id === p.company_id && x.name === p.name,
+        )
+      ) {
+        throw new Error('duplicate project name for company');
+      }
+      const row: Project = { ...p, id: randomUUID(), created_at: now(), updated_at: now() };
+      this.projectsById.set(row.id, row);
+      return row;
+    },
+    get: async (id: string) => this.projectsById.get(id) ?? null,
+    list: async (companyId?: string) =>
+      [...this.projectsById.values()]
+        .filter((p) => !companyId || p.company_id === companyId)
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    update: async (id: string, patch: ProjectPatch) => {
+      const existing = this.projectsById.get(id);
+      if (!existing) return null;
+      const updated: Project = { ...existing, ...patch, id, updated_at: now() };
+      this.projectsById.set(id, updated);
+      return updated;
+    },
+  };
+
   evalCases = {
     create: async (c: NewEvalCase): Promise<EvalCase> => {
       const row: EvalCase = { ...c, id: randomUUID(), created_at: now() };

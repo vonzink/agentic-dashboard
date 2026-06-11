@@ -19,6 +19,7 @@ export class TaskService {
       task_type: Task['task_type'];
       priority: Task['priority'];
       company_id?: string | null;
+      project_id?: string | null;
       assigned_to?: string | null;
       borrower_reference?: string | null;
       loan_reference?: string | null;
@@ -27,12 +28,21 @@ export class TaskService {
     },
   ): Promise<Task> {
     const company = await this.companies.resolve(body.company_id);
+    if (body.project_id) {
+      const project = await this.store.projects.get(body.project_id);
+      if (!project) throw ApiError.badRequest('project_id does not exist');
+      // COMPLIANCE: a task's project must belong to the task's company.
+      if (project.company_id !== company.id) {
+        throw ApiError.badRequest('project_id belongs to a different company');
+      }
+    }
     const task = await this.store.tasks.create({
       title: body.title,
       task_type: body.task_type,
       status: 'open',
       priority: body.priority,
       company_id: company.id,
+      project_id: body.project_id ?? null,
       created_by: actor.email,
       assigned_to: body.assigned_to ?? null,
       borrower_reference: body.borrower_reference ?? null,

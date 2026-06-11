@@ -12,6 +12,7 @@ import {
   createCompanyBody,
   createDocumentBody,
   createInputBody,
+  createProjectBody,
   createPromptBody,
   createRunBody,
   createTaskBody,
@@ -19,6 +20,7 @@ import {
   listAuditQuery,
   listDocumentsQuery,
   listEvalsQuery,
+  listProjectsQuery,
   listOutputsQuery,
   listPromptsQuery,
   listTasksQuery,
@@ -26,6 +28,7 @@ import {
   runEvalsBody,
   searchQuery,
   updateEvalCaseBody,
+  updateProjectBody,
   updateCompanyBody,
   updatePromptBody,
   updateTaskBody,
@@ -292,6 +295,27 @@ export function buildRouter(s: Services): Router {
   r.get('/quality', requireRole('viewer'), async (req, res) => {
     const { days, company_id } = usageQuery.parse(req.query);
     res.json(await s.quality.summary(days, company_id));
+  });
+
+  // ----- projects (GitHub-linked registry) -------------------------------------------
+  r.get('/projects', requireRole('viewer'), async (req, res) => {
+    const { company_id } = listProjectsQuery.parse(req.query);
+    res.json({ items: await s.projects.list(company_id) });
+  });
+
+  r.post('/projects', requireRole('admin'), async (req, res) => {
+    const body = createProjectBody.parse(req.body);
+    res.status(201).json(await s.projects.create(currentUser(req), body));
+  });
+
+  r.patch('/projects/:id', requireRole('admin'), async (req, res) => {
+    const body = updateProjectBody.parse(req.body);
+    res.json(await s.projects.update(currentUser(req), param(req, 'id'), body));
+  });
+
+  // Pull fresh repo metadata + README from GitHub (read-only token).
+  r.post('/projects/:id/sync', requireRole('operator'), async (req, res) => {
+    res.json(await s.projects.sync(currentUser(req), param(req, 'id')));
   });
 
   // ----- eval sets -----------------------------------------------------------------

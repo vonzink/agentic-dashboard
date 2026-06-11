@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTasks } from '../api/hooks';
 import { activeCompanyId } from '../lib/company';
 import { Badge } from '../components/Badge';
@@ -17,9 +17,17 @@ const PRIORITIES = ['low', 'normal', 'high', 'urgent'];
 
 export function TasksPage() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const projectId = params.get('project') ?? undefined;
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({ status: '', task_type: '', priority: '', assigned_to: '', search: '' });
-  const query = useTasks({ ...filters, company_id: activeCompanyId() ?? undefined, page, pageSize: 20 });
+  const query = useTasks({
+    ...filters,
+    company_id: activeCompanyId() ?? undefined,
+    project_id: projectId,
+    page,
+    pageSize: 20,
+  });
 
   const set = (key: keyof typeof filters) => (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
     setFilters((f) => ({ ...f, [key]: e.target.value }));

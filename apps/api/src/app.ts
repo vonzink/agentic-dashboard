@@ -8,6 +8,7 @@ import type { Store } from './repositories/interfaces';
 import { buildRouter } from './routes';
 import { buildIntakeRouter } from './routes/intake';
 import { buildServices, type Services } from './services';
+import type { GitHubClient } from './services/github';
 import type { Notifier } from './services/notifications';
 import type { BlobStorage } from './services/storage';
 
@@ -17,9 +18,14 @@ import type { BlobStorage } from './services/storage';
 export function buildApp(
   store: Store,
   config: AppConfig,
-  deps: { verifier?: CognitoVerifier; storage?: BlobStorage; notifier?: Notifier } = {},
+  deps: {
+    verifier?: CognitoVerifier;
+    storage?: BlobStorage;
+    notifier?: Notifier;
+    github?: GitHubClient;
+  } = {},
 ): { app: express.Express; services: Services } {
-  const services = buildServices(store, config, deps.storage, deps.notifier);
+  const services = buildServices(store, config, deps.storage, deps.notifier, deps.github);
   const app = express();
 
   app.disable('x-powered-by');

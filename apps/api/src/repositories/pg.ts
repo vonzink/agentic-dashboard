@@ -9,6 +9,7 @@ import type {
   EvalRun,
   IntegrationAction,
   Paginated,
+  Project,
   PromptTemplate,
   SourceChunk,
   SourceDocument,
@@ -29,6 +30,7 @@ import type {
   NewEvalCase,
   NewEvalRun,
   NewIntegrationAction,
+  NewProject,
   NewPromptTemplate,
   NewSourceChunk,
   NewSourceDocument,
@@ -37,6 +39,7 @@ import type {
   NewTaskRun,
   NewWorkflowConfig,
   OutputFilter,
+  ProjectPatch,
   OutputListItem,
   Page,
   Store,
@@ -85,6 +88,12 @@ const mapAction = (r: any): IntegrationAction => ({
   completed_at: iso(r.completed_at),
 });
 const mapEvalCase = (r: any): EvalCase => ({ ...r, created_at: iso(r.created_at)! });
+const mapProject = (r: any): Project => ({
+  ...r,
+  created_at: iso(r.created_at)!,
+  updated_at: iso(r.updated_at)!,
+  github_synced_at: iso(r.github_synced_at),
+});
 const mapEvalRun = (r: any): EvalRun => ({ ...r, created_at: iso(r.created_at)! });
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -118,6 +127,46 @@ export class PgStore implements Store {
    * their audit events atomically. Nested calls reuse the outer
    * transaction.
    */
+  projects = {
+    create: async (p: NewProject): Promise<Project> => {
+      const { rows } = await this.db.query(
+        `INSERT INTO ai_projects (company_id, name, description, github_repo, live_url,
+           status, notes, github_meta_json, github_synced_at, github_readme_sha,
+           readme_document_id, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+        [
+          p.company_id, p.name, p.description, p.github_repo, p.live_url,
+          p.status, p.notes,
+          p.github_meta_json ? JSON.stringify(p.github_meta_json) : null,
+          p.github_synced_at, p.github_readme_sha, p.readme_document_id, p.created_by,
+        ],
+      );
+      return mapProject(rows[0]);
+    },
+    get: async (id: string) => {
+      const { rows } = await this.db.query('SELECT * FROM ai_projects WHERE id = $1', [id]);
+      return rows[0] ? mapProject(rows[0]) : null;
+    },
+    list: async (companyId?: string) => {
+      const { rows } = companyId
+        ? await this.db.query(
+            'SELECT * FROM ai_projects WHERE company_id = $1 ORDER BY name ASC',
+            [companyId],
+          )
+        : await this.db.query('SELECT * FROM ai_projects ORDER BY name ASC');
+      return rows.map(mapProject);
+    },
+    update: async (id: string, patch: ProjectPatch) => {
+      if (!Object.keys(patch).length) return this.projects.get(id);
+      const { sets, values, next } = setClause(patch as Record<string, unknown>);
+      const { rows } = await this.db.query(
+        `UPDATE ai_projects SET ${sets} WHERE id = $${next} RETURNING *`,
+        [...values, id],
+      );
+      return rows[0] ? mapProject(rows[0]) : null;
+    },
+  };
+
   evalCases = {
     create: async (c: NewEvalCase): Promise<EvalCase> => {
       const { rows } = await this.db.query(
@@ -228,12 +277,12 @@ export class PgStore implements Store {
   tasks = {
     create: async (t: NewTask): Promise<Task> => {
       const { rows } = await this.db.query(
-        `INSERT INTO ai_tasks (title, task_type, status, priority, company_id, created_by,
-           assigned_to, borrower_reference, loan_reference, due_at, metadata_json)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+        `INSERT INTO ai_tasks (title, task_type, status, priority, company_id, project_id,
+           created_by, assigned_to, borrower_reference, loan_reference, due_at, metadata_json)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
         [
-          t.title, t.task_type, t.status, t.priority, t.company_id, t.created_by,
-          t.assigned_to, t.borrower_reference, t.loan_reference, t.due_at,
+          t.title, t.task_type, t.status, t.priority, t.company_id, t.project_id,
+          t.created_by, t.assigned_to, t.borrower_reference, t.loan_reference, t.due_at,
           JSON.stringify(t.metadata_json),
         ],
       );
@@ -260,6 +309,7 @@ export class PgStore implements Store {
         where.push(cond.replace('?', `$${params.length}`));
       };
       if (filter.company_id) add('company_id = ?', filter.company_id);
+      if (filter.project_id) add('project_id = ?', filter.project_id);
       if (filter.status) add('status = ?', filter.status);
       if (filter.task_type) add('task_type = ?', filter.task_type);
       if (filter.priority) add('priority = ?', filter.priority);

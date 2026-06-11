@@ -45,6 +45,9 @@ export interface AppConfig {
   /** Shared secret for POST /api/intake/email (Zapier/Make forwarders).
    * null = intake endpoint disabled. */
   intakeToken: string | null;
+  /** Fine-grained read-only PAT for the Projects registry (repos stay
+   * private). null = project GitHub sync disabled. */
+  githubToken: string | null;
 }
 
 export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
@@ -91,6 +94,7 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
       : null,
     appBaseUrl: process.env.APP_BASE_URL ?? null,
     intakeToken: process.env.INTAKE_TOKEN ?? null,
+    githubToken: process.env.GITHUB_TOKEN ?? null,
     ...overrides,
   };
 

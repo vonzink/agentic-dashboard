@@ -108,7 +108,7 @@ describe.skipIf(!url)('Postgres integration', () => {
     const company = (await store.companies.getBySlug('msfg'))!;
     const task = await store.tasks.create({
       title: 'trigger test', task_type: 'general', status: 'open', priority: 'normal',
-      company_id: company.id, created_by: 't@test.local', assigned_to: null,
+      company_id: company.id, project_id: null, created_by: 't@test.local', assigned_to: null,
       borrower_reference: null, loan_reference: null, due_at: null, metadata_json: {},
     });
     await expect(
@@ -140,7 +140,7 @@ describe.skipIf(!url)('Postgres integration', () => {
         const company = (await tx.companies.getBySlug('msfg'))!;
         await tx.tasks.create({
           title: 'will be rolled back', task_type: 'general', status: 'open', priority: 'normal',
-          company_id: company.id, created_by: 'tx@test.local', assigned_to: null,
+          company_id: company.id, project_id: null, created_by: 'tx@test.local', assigned_to: null,
           borrower_reference: null, loan_reference: null, due_at: null, metadata_json: {},
         });
         throw new Error('boom');

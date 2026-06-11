@@ -32,6 +32,8 @@ export interface Task {
   status: TaskStatus;
   priority: TaskPriority;
   company_id: string;
+  /** Optional link to a registered project (per-project AI reporting). */
+  project_id: string | null;
   created_by: string;
   assigned_to: string | null;
   borrower_reference: string | null;
@@ -182,6 +184,38 @@ export interface IntegrationAction {
 export interface AuthUser {
   email: string;
   role: import('./statuses').Role;
+}
+
+export type ProjectStatus = 'active' | 'paused' | 'archived';
+
+/** Cached GitHub repo metadata (refreshed on sync, never authoritative). */
+export interface GitHubRepoMeta {
+  description: string | null;
+  default_branch: string;
+  pushed_at: string | null;
+  open_issues: number;
+  stars: number;
+  private: boolean;
+  html_url: string;
+}
+
+/** A codebase/product the dashboard tracks, linked to its GitHub repo. */
+export interface Project {
+  id: string;
+  company_id: string;
+  name: string;
+  description: string | null;
+  github_repo: string | null;
+  live_url: string | null;
+  status: ProjectStatus;
+  notes: string | null;
+  github_meta_json: GitHubRepoMeta | null;
+  github_synced_at: string | null;
+  github_readme_sha: string | null;
+  readme_document_id: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
 }
 
 /** A saved eval input for one workflow (synthetic content only). */

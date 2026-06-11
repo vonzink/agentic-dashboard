@@ -9,6 +9,7 @@ const NAV = [
   { to: '/tasks', label: 'Task Queue', title: 'AI Task Queue' },
   { to: '/approvals', label: 'Approval Center', title: 'Human Approval Center' },
   { to: '/workflows', label: 'Workflows', title: 'Workflow Pipelines' },
+  { to: '/projects', label: 'Projects', title: 'Projects' },
   { to: '/documents', label: 'Documents', title: 'Document Library' },
   { to: '/audit', label: 'Audit Log', title: 'Audit Log' },
   { to: '/admin', label: 'Admin', title: 'Prompt & Workflow Admin' },

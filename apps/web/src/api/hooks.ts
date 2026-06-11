@@ -17,6 +17,7 @@ import type {
   IntegrationStatus,
   OutputDetail,
   Paginated,
+  Project,
   PromptTemplate,
   QualitySummary,
   ReviewQueueItem,
@@ -157,6 +158,7 @@ export function useCreateTask() {
       title: string;
       task_type: string;
       company_id?: string;
+      project_id?: string;
       priority?: string;
       assigned_to?: string;
       borrower_reference?: string;
@@ -355,6 +357,51 @@ export function useSetPromptActive() {
     mutationFn: ({ id, is_active }: { id: string; is_active: boolean }) =>
       apiFetch<PromptTemplate>(`/prompts/${id}`, { method: 'PATCH', body: { is_active } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['prompts'] }),
+  });
+}
+
+// ---------- projects ----------
+
+export function useProjects(companyId?: string) {
+  return useQuery({
+    queryKey: ['projects', companyId],
+    queryFn: () =>
+      apiFetch<{ items: Project[] }>('/projects', { query: { company_id: companyId } }),
+  });
+}
+
+export function useCreateProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      name: string;
+      company_id?: string;
+      description?: string;
+      github_repo?: string;
+      live_url?: string;
+      notes?: string;
+    }) => apiFetch<Project>('/projects', { method: 'POST', body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
+  });
+}
+
+export function useUpdateProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string; status?: Project['status']; name?: string; description?: string | null; github_repo?: string | null; live_url?: string | null; notes?: string | null }) =>
+      apiFetch<Project>(`/projects/${id}`, { method: 'PATCH', body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
+  });
+}
+
+export function useSyncProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<Project>(`/projects/${id}/sync`, { method: 'POST' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['projects'] });
+      qc.invalidateQueries({ queryKey: ['documents'] });
+    },
   });
 }
 

@@ -68,6 +68,7 @@ export interface Task {
   status: TaskStatus;
   priority: TaskPriority;
   company_id: string;
+  project_id: string | null;
   created_by: string;
   assigned_to: string | null;
   borrower_reference: string | null;
@@ -381,6 +382,37 @@ export interface SearchHit {
   content: string;
   page_number: number | null;
   score: number;
+}
+
+/** Projects registry — codebases linked to (private) GitHub repos. */
+export type ProjectStatus = 'active' | 'paused' | 'archived';
+
+export interface GitHubRepoMeta {
+  description: string | null;
+  default_branch: string;
+  pushed_at: string | null;
+  open_issues: number;
+  stars: number;
+  private: boolean;
+  html_url: string;
+}
+
+export interface Project {
+  id: string;
+  company_id: string;
+  name: string;
+  description: string | null;
+  github_repo: string | null;
+  live_url: string | null;
+  status: ProjectStatus;
+  notes: string | null;
+  github_meta_json: GitHubRepoMeta | null;
+  github_synced_at: string | null;
+  github_readme_sha: string | null;
+  readme_document_id: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
 }
 
 /** Eval sets — saved test inputs per workflow (synthetic content only). */

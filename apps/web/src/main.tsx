@@ -10,6 +10,7 @@ import { AuditLogPage } from './pages/AuditLog';
 import { DashboardPage } from './pages/Dashboard';
 import { DocumentsPage } from './pages/Documents';
 import { NewTaskPage } from './pages/NewTask';
+import { ProjectsPage } from './pages/Projects';
 import { TaskDetailPage } from './pages/TaskDetail';
 import { TasksPage } from './pages/Tasks';
 import { WorkflowsPage } from './pages/Workflows';
@@ -30,6 +31,7 @@ const router = createBrowserRouter([
       { path: 'tasks/:id', element: <TaskDetailPage /> },
       { path: 'approvals', element: <ApprovalsPage /> },
       { path: 'workflows', element: <WorkflowsPage /> },
+      { path: 'projects', element: <ProjectsPage /> },
       { path: 'documents', element: <DocumentsPage /> },
       { path: 'audit', element: <AuditLogPage /> },
       { path: 'admin', element: <AdminPage /> },

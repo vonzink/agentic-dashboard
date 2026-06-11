@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiFetch } from '../api/client';
-import { useCompanies, useCreateDocument, useCreateTask, useWorkflows } from '../api/hooks';
+import { useCompanies, useCreateDocument, useCreateTask, useProjects, useWorkflows } from '../api/hooks';
 import { activeCompanyId } from '../lib/company';
 import type { InputType, TaskType } from '../api/types';
 import { ErrorState } from '../components/States';
@@ -43,11 +43,13 @@ export function NewTaskPage() {
     context: '',
     snippet_label: '',
     snippet_text: '',
+    project_id: '',
   });
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
 
   const companies = useCompanies();
+  const projects = useProjects(activeCompanyId() ?? undefined);
   const activeCompany = companies.data?.items.find((c) => c.id === activeCompanyId());
   const matchingWorkflow = workflows.data?.items.find(
     (w) => w.task_type === form.task_type && w.implemented,
@@ -64,6 +66,7 @@ export function NewTaskPage() {
         title: form.title.trim(),
         task_type: form.task_type,
         company_id: activeCompanyId() ?? undefined,
+        project_id: form.project_id || undefined,
         priority: form.priority,
         borrower_reference: form.borrower_reference.trim() || undefined,
         loan_reference: form.loan_reference.trim() || undefined,
@@ -129,6 +132,18 @@ export function NewTaskPage() {
             {['low', 'normal', 'high', 'urgent'].map((p) => <option key={p} value={p}>{titleCase(p)}</option>)}
           </select>
         </label>
+        {(projects.data?.items.length ?? 0) > 0 && (
+          <label className="field grow">
+            Project
+            <select value={form.project_id}
+              onChange={(e) => setForm({ ...form, project_id: e.target.value })}>
+              <option value="">(none)</option>
+              {projects.data!.items
+                .filter((p) => p.status !== 'archived')
+                .map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </label>
+        )}
       </div>
 
       <div className="row">

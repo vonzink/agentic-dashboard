@@ -8,8 +8,10 @@ import { AuditService } from './audit';
 import { CompanyService } from './companies';
 import { DocumentService } from './documents';
 import { EvalService } from './evals';
+import { createGitHubClient, type GitHubClient } from './github';
 import { LocalHashEmbedder, type EmbeddingProvider } from './embeddings';
 import { createNotifier, NotificationService, type Notifier } from './notifications';
+import { ProjectService } from './projects';
 import { PromptService } from './prompts';
 import { QualityService } from './quality';
 import { RetrievalService } from './retrieval';
@@ -29,6 +31,7 @@ export interface Services {
   quality: QualityService;
   notifications: NotificationService;
   evals: EvalService;
+  projects: ProjectService;
   provider: ModelProvider;
   storage: BlobStorage;
   embedder: EmbeddingProvider;
@@ -42,6 +45,7 @@ export function buildServices(
   config: AppConfig,
   storage?: BlobStorage,
   notifier?: Notifier,
+  github?: GitHubClient,
 ): Services {
   const audit = new AuditService(store);
   const companies = new CompanyService(store, audit);
@@ -59,8 +63,11 @@ export function buildServices(
   const actions = new ActionService(store, audit, config);
   const quality = new QualityService(store);
   const evals = new EvalService(store, audit, prompts, providerRegistry);
+  const projects = new ProjectService(
+    store, audit, companies, documents, github ?? createGitHubClient(config.githubToken),
+  );
   return {
     audit, companies, tasks, documents, prompts, runs, approvals, actions, quality, notifications,
-    evals, provider, storage: blobStorage, embedder, retrieval, store, config,
+    evals, projects, provider, storage: blobStorage, embedder, retrieval, store, config,
   };
 }
