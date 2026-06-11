@@ -6,6 +6,7 @@ import { errorHandler, notFoundHandler } from './middleware/error';
 import { requestLog } from './middleware/requestLog';
 import type { Store } from './repositories/interfaces';
 import { buildRouter } from './routes';
+import { buildIntakeRouter } from './routes/intake';
 import { buildServices, type Services } from './services';
 import type { Notifier } from './services/notifications';
 import type { BlobStorage } from './services/storage';
@@ -24,6 +25,8 @@ export function buildApp(
   app.disable('x-powered-by');
   app.use(requestLog());
   app.use(express.json({ limit: '2mb' }));
+  // Machine-to-machine intake (shared secret, not Cognito) — see routes/intake.ts.
+  app.use('/api/intake', buildIntakeRouter(services));
   app.use('/api/ai', authMiddleware(config, deps.verifier), buildRouter(services));
   app.use(notFoundHandler);
   app.use(errorHandler);

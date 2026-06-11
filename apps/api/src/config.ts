@@ -42,6 +42,9 @@ export interface AppConfig {
   } | null;
   /** Public dashboard URL used in notification links (e.g. https://agentic.zvzsolutions.com). */
   appBaseUrl: string | null;
+  /** Shared secret for POST /api/intake/email (Zapier/Make forwarders).
+   * null = intake endpoint disabled. */
+  intakeToken: string | null;
 }
 
 export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
@@ -87,6 +90,7 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
         }
       : null,
     appBaseUrl: process.env.APP_BASE_URL ?? null,
+    intakeToken: process.env.INTAKE_TOKEN ?? null,
     ...overrides,
   };
 
