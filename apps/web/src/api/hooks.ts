@@ -9,6 +9,8 @@ import type {
   Classification,
   DocumentDetail,
   DocumentType,
+  EvalCase,
+  EvalRun,
   HealthResponse,
   InputType,
   IntegrationAction,
@@ -353,6 +355,57 @@ export function useSetPromptActive() {
     mutationFn: ({ id, is_active }: { id: string; is_active: boolean }) =>
       apiFetch<PromptTemplate>(`/prompts/${id}`, { method: 'PATCH', body: { is_active } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['prompts'] }),
+  });
+}
+
+// ---------- eval sets ----------
+
+export function useEvalCases(workflowName?: string) {
+  return useQuery({
+    queryKey: ['evals', 'cases', workflowName],
+    queryFn: () =>
+      apiFetch<{ items: EvalCase[] }>('/evals/cases', { query: { workflow_name: workflowName } }),
+  });
+}
+
+export function useCreateEvalCase() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      workflow_name: string;
+      name: string;
+      primary_text: string;
+      source_text?: string;
+      contains?: string[];
+      min_confidence?: 'HIGH' | 'MEDIUM' | 'LOW';
+    }) => apiFetch<EvalCase>('/evals/cases', { method: 'POST', body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['evals', 'cases'] }),
+  });
+}
+
+export function useSetEvalCaseActive() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, is_active }: { id: string; is_active: boolean }) =>
+      apiFetch<EvalCase>(`/evals/cases/${id}`, { method: 'PATCH', body: { is_active } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['evals', 'cases'] }),
+  });
+}
+
+export function useEvalRuns(workflowName?: string) {
+  return useQuery({
+    queryKey: ['evals', 'runs', workflowName],
+    queryFn: () =>
+      apiFetch<{ items: EvalRun[] }>('/evals/runs', { query: { workflow_name: workflowName } }),
+  });
+}
+
+export function useRunEvals() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { workflow_name: string; prompt_id?: string }) =>
+      apiFetch<EvalRun>('/evals/run', { method: 'POST', body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['evals', 'runs'] }),
   });
 }
 

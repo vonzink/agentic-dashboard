@@ -4,6 +4,8 @@ import type {
   Approval,
   AuditEvent,
   Citation,
+  EvalCase,
+  EvalRun,
   IntegrationAction,
   Paginated,
   PromptTemplate,
@@ -66,6 +68,8 @@ export type NewCitation = Omit<Citation, 'id' | 'created_at'>;
 export type NewPromptTemplate = Omit<PromptTemplate, 'id' | 'created_at'>;
 export type NewWorkflowConfig = Omit<WorkflowConfig, 'id' | 'created_at' | 'updated_at'>;
 export type NewIntegrationAction = Omit<IntegrationAction, 'id' | 'created_at' | 'completed_at'>;
+export type NewEvalCase = Omit<EvalCase, 'id' | 'created_at'>;
+export type NewEvalRun = Omit<EvalRun, 'id' | 'created_at'>;
 
 /** Aggregated AI usage/cost figures (PRD: AI cost monitoring). */
 export interface UsageSummary {
@@ -238,6 +242,16 @@ export interface Store {
     ): Promise<IntegrationAction | null>;
     list(filter: ActionFilter): Promise<Paginated<IntegrationAction>>;
     listByTask(taskId: string): Promise<IntegrationAction[]>;
+  };
+  evalCases: {
+    create(c: NewEvalCase): Promise<EvalCase>;
+    get(id: string): Promise<EvalCase | null>;
+    list(workflowName?: string): Promise<EvalCase[]>;
+    setActive(id: string, active: boolean): Promise<EvalCase | null>;
+  };
+  evalRuns: {
+    create(r: NewEvalRun): Promise<EvalRun>;
+    list(workflowName?: string, limit?: number): Promise<EvalRun[]>;
   };
   /**
    * Runs `fn` atomically: PgStore wraps it in BEGIN/COMMIT on one client;

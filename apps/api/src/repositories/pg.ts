@@ -5,6 +5,8 @@ import type {
   Company,
   AuditEvent,
   Citation,
+  EvalCase,
+  EvalRun,
   IntegrationAction,
   Paginated,
   PromptTemplate,
@@ -24,6 +26,8 @@ import type {
   NewApproval,
   NewAuditEvent,
   NewCitation,
+  NewEvalCase,
+  NewEvalRun,
   NewIntegrationAction,
   NewPromptTemplate,
   NewSourceChunk,
@@ -80,6 +84,8 @@ const mapAction = (r: any): IntegrationAction => ({
   created_at: iso(r.created_at)!,
   completed_at: iso(r.completed_at),
 });
+const mapEvalCase = (r: any): EvalCase => ({ ...r, created_at: iso(r.created_at)! });
+const mapEvalRun = (r: any): EvalRun => ({ ...r, created_at: iso(r.created_at)! });
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 const limitOffset = ({ page, pageSize }: Page) =>
@@ -112,6 +118,66 @@ export class PgStore implements Store {
    * their audit events atomically. Nested calls reuse the outer
    * transaction.
    */
+  evalCases = {
+    create: async (c: NewEvalCase): Promise<EvalCase> => {
+      const { rows } = await this.db.query(
+        `INSERT INTO ai_eval_cases (workflow_name, name, input_json, expectations_json,
+           is_active, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+        [
+          c.workflow_name, c.name, JSON.stringify(c.input_json),
+          JSON.stringify(c.expectations_json), c.is_active, c.created_by,
+        ],
+      );
+      return mapEvalCase(rows[0]);
+    },
+    get: async (id: string) => {
+      const { rows } = await this.db.query('SELECT * FROM ai_eval_cases WHERE id = $1', [id]);
+      return rows[0] ? mapEvalCase(rows[0]) : null;
+    },
+    list: async (workflowName?: string) => {
+      const { rows } = workflowName
+        ? await this.db.query(
+            'SELECT * FROM ai_eval_cases WHERE workflow_name = $1 ORDER BY created_at DESC',
+            [workflowName],
+          )
+        : await this.db.query('SELECT * FROM ai_eval_cases ORDER BY created_at DESC');
+      return rows.map(mapEvalCase);
+    },
+    setActive: async (id: string, active: boolean) => {
+      const { rows } = await this.db.query(
+        'UPDATE ai_eval_cases SET is_active = $1 WHERE id = $2 RETURNING *',
+        [active, id],
+      );
+      return rows[0] ? mapEvalCase(rows[0]) : null;
+    },
+  };
+
+  evalRuns = {
+    create: async (r: NewEvalRun): Promise<EvalRun> => {
+      const { rows } = await this.db.query(
+        `INSERT INTO ai_eval_runs (workflow_name, prompt_version, model_provider, model_name,
+           passed_count, failed_count, results_json, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+        [
+          r.workflow_name, r.prompt_version, r.model_provider, r.model_name,
+          r.passed_count, r.failed_count, JSON.stringify(r.results_json), r.created_by,
+        ],
+      );
+      return mapEvalRun(rows[0]);
+    },
+    list: async (workflowName?: string, limit = 20) => {
+      const { rows } = workflowName
+        ? await this.db.query(
+            `SELECT * FROM ai_eval_runs WHERE workflow_name = $1
+             ORDER BY created_at DESC LIMIT $2`,
+            [workflowName, limit],
+          )
+        : await this.db.query('SELECT * FROM ai_eval_runs ORDER BY created_at DESC LIMIT $1', [limit]);
+      return rows.map(mapEvalRun);
+    },
+  };
+
   async withTransaction<T>(fn: (s: Store) => Promise<T>): Promise<T> {
     if (this.inTx) return fn(this);
     const client = await (this.db as Pool).connect();

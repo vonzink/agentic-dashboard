@@ -7,6 +7,7 @@ import { ApprovalService } from './approvals';
 import { AuditService } from './audit';
 import { CompanyService } from './companies';
 import { DocumentService } from './documents';
+import { EvalService } from './evals';
 import { LocalHashEmbedder, type EmbeddingProvider } from './embeddings';
 import { createNotifier, NotificationService, type Notifier } from './notifications';
 import { PromptService } from './prompts';
@@ -27,6 +28,7 @@ export interface Services {
   actions: ActionService;
   quality: QualityService;
   notifications: NotificationService;
+  evals: EvalService;
   provider: ModelProvider;
   storage: BlobStorage;
   embedder: EmbeddingProvider;
@@ -56,8 +58,9 @@ export function buildServices(
   const approvals = new ApprovalService(store, audit, config);
   const actions = new ActionService(store, audit, config);
   const quality = new QualityService(store);
+  const evals = new EvalService(store, audit, prompts, providerRegistry);
   return {
     audit, companies, tasks, documents, prompts, runs, approvals, actions, quality, notifications,
-    provider, storage: blobStorage, embedder, retrieval, store, config,
+    evals, provider, storage: blobStorage, embedder, retrieval, store, config,
   };
 }

@@ -8,6 +8,7 @@ import {
   budgetQuery,
   createActionBody,
   createChunkBody,
+  createEvalCaseBody,
   createCompanyBody,
   createDocumentBody,
   createInputBody,
@@ -17,11 +18,14 @@ import {
   listActionsQuery,
   listAuditQuery,
   listDocumentsQuery,
+  listEvalsQuery,
   listOutputsQuery,
   listPromptsQuery,
   listTasksQuery,
   rejectBody,
+  runEvalsBody,
   searchQuery,
+  updateEvalCaseBody,
   updateCompanyBody,
   updatePromptBody,
   updateTaskBody,
@@ -288,6 +292,34 @@ export function buildRouter(s: Services): Router {
   r.get('/quality', requireRole('viewer'), async (req, res) => {
     const { days, company_id } = usageQuery.parse(req.query);
     res.json(await s.quality.summary(days, company_id));
+  });
+
+  // ----- eval sets -----------------------------------------------------------------
+  // Saved test inputs per workflow, run against a prompt version before
+  // activating it. Sandboxed: no tasks/outputs/review-queue side effects.
+  r.get('/evals/cases', requireRole('viewer'), async (req, res) => {
+    const { workflow_name } = listEvalsQuery.parse(req.query);
+    res.json({ items: await s.evals.listCases(workflow_name) });
+  });
+
+  r.post('/evals/cases', requireRole('admin'), async (req, res) => {
+    const body = createEvalCaseBody.parse(req.body);
+    res.status(201).json(await s.evals.createCase(currentUser(req), body));
+  });
+
+  r.patch('/evals/cases/:id', requireRole('admin'), async (req, res) => {
+    const body = updateEvalCaseBody.parse(req.body);
+    res.json(await s.evals.setCaseActive(currentUser(req), param(req, 'id'), body.is_active));
+  });
+
+  r.get('/evals/runs', requireRole('viewer'), async (req, res) => {
+    const { workflow_name } = listEvalsQuery.parse(req.query);
+    res.json({ items: await s.evals.listRuns(workflow_name) });
+  });
+
+  r.post('/evals/run', requireRole('admin'), async (req, res) => {
+    const body = runEvalsBody.parse(req.body);
+    res.status(201).json(await s.evals.run(currentUser(req), body.workflow_name, body.prompt_id));
   });
 
   // ----- prompts (admin) ----------------------------------------------------------

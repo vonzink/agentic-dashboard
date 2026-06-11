@@ -108,6 +108,25 @@ export const updateCompanyBody = z
 
 export const budgetQuery = z.object({ company_id: z.uuid().optional() });
 
+/** Eval sets: cases are synthetic test inputs — never borrower data. */
+export const createEvalCaseBody = z.object({
+  workflow_name: z.string().min(1).max(100),
+  name: z.string().min(1).max(200),
+  primary_text: z.string().min(1).max(20_000),
+  source_text: z.string().max(50_000).nullish(),
+  contains: z.array(z.string().min(1).max(500)).max(20).optional(),
+  min_confidence: z.enum(['HIGH', 'MEDIUM', 'LOW']).optional(),
+});
+
+export const updateEvalCaseBody = z.object({ is_active: z.boolean() });
+
+export const runEvalsBody = z.object({
+  workflow_name: z.string().min(1).max(100),
+  prompt_id: z.uuid().optional(),
+});
+
+export const listEvalsQuery = z.object({ workflow_name: z.string().max(100).optional() });
+
 /** PATCH /workflows/:name — admin tuning of a workflow's config.
  * model_config_json replaces the whole object; {} clears routing. */
 export const updateWorkflowBody = z

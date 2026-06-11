@@ -5,6 +5,8 @@ import type {
   Company,
   AuditEvent,
   Citation,
+  EvalCase,
+  EvalRun,
   IntegrationAction,
   Paginated,
   PromptTemplate,
@@ -24,6 +26,8 @@ import type {
   NewApproval,
   NewAuditEvent,
   NewCitation,
+  NewEvalCase,
+  NewEvalRun,
   NewIntegrationAction,
   NewPromptTemplate,
   NewSourceChunk,
@@ -75,6 +79,8 @@ export class MemoryStore implements Store {
   private promptsById = new Map<string, PromptTemplate>();
   private configsByName = new Map<string, WorkflowConfig>();
   private actionsById = new Map<string, IntegrationAction>();
+  private evalCasesById = new Map<string, EvalCase>();
+  private evalRunsById = new Map<string, EvalRun>();
 
   companies = {
     create: async (c: NewCompany): Promise<Company> => {
@@ -485,6 +491,39 @@ export class MemoryStore implements Store {
 
   /** No real transactionality in memory: JS is single-threaded and tests
    * don't need rollback, only the same call shape as PgStore. */
+  evalCases = {
+    create: async (c: NewEvalCase): Promise<EvalCase> => {
+      const row: EvalCase = { ...c, id: randomUUID(), created_at: now() };
+      this.evalCasesById.set(row.id, row);
+      return row;
+    },
+    get: async (id: string) => this.evalCasesById.get(id) ?? null,
+    list: async (workflowName?: string) =>
+      [...this.evalCasesById.values()]
+        .filter((c) => !workflowName || c.workflow_name === workflowName)
+        .sort(byCreatedDesc),
+    setActive: async (id: string, active: boolean) => {
+      const existing = this.evalCasesById.get(id);
+      if (!existing) return null;
+      const updated = { ...existing, is_active: active };
+      this.evalCasesById.set(id, updated);
+      return updated;
+    },
+  };
+
+  evalRuns = {
+    create: async (r: NewEvalRun): Promise<EvalRun> => {
+      const row: EvalRun = { ...r, id: randomUUID(), created_at: now() };
+      this.evalRunsById.set(row.id, row);
+      return row;
+    },
+    list: async (workflowName?: string, limit = 20) =>
+      [...this.evalRunsById.values()]
+        .filter((r) => !workflowName || r.workflow_name === workflowName)
+        .sort(byCreatedDesc)
+        .slice(0, limit),
+  };
+
   async withTransaction<T>(fn: (s: Store) => Promise<T>): Promise<T> {
     return fn(this);
   }

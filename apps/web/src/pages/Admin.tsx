@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useCompanies, useCreateCompany, useCreatePrompt, usePrompts, useSetPromptActive, useUpdateCompany, useUpdateWorkflow, useWorkflows } from '../api/hooks';
+import { useCompanies, useCreateCompany, useCreateEvalCase, useCreatePrompt, useEvalCases, useEvalRuns, usePrompts, useRunEvals, useSetEvalCaseActive, useSetPromptActive, useUpdateCompany, useUpdateWorkflow, useWorkflows } from '../api/hooks';
 import type { PromptTemplate, WorkflowInfo } from '../api/types';
 import { Badge } from '../components/Badge';
 import { EmptyState, ErrorState, Loading } from '../components/States';
@@ -197,6 +197,172 @@ function CompaniesTab() {
   );
 }
 
+function EvalsTab({ workflows }: { workflows: WorkflowInfo[] }) {
+  const implemented = workflows.filter((w) => w.implemented);
+  const [workflow, setWorkflow] = useState(implemented[0]?.workflow_name ?? '');
+  const cases = useEvalCases(workflow || undefined);
+  const runs = useEvalRuns(workflow || undefined);
+  const createCase = useCreateEvalCase();
+  const setActive = useSetEvalCaseActive();
+  const runEvals = useRunEvals();
+  const [form, setForm] = useState({ name: '', primary_text: '', contains: '', min_confidence: '' });
+  const lastRun = runs.data?.items[0];
+
+  return (
+    <div>
+      <div className="panel">
+        <h2>Eval sets</h2>
+        <p className="muted">
+          Saved test inputs per workflow — run them against a prompt version <em>before</em>{' '}
+          activating it, so prompt changes ship with evidence. Eval runs are sandboxed: no
+          tasks, no outputs, nothing enters the review queue. Synthetic content only — never
+          borrower data.
+        </p>
+        <div className="filter-bar">
+          <select value={workflow} onChange={(e) => setWorkflow(e.target.value)}>
+            {implemented.map((w) => (
+              <option key={w.workflow_name} value={w.workflow_name}>{titleCase(w.workflow_name)}</option>
+            ))}
+          </select>
+          <button
+            className="btn primary"
+            disabled={runEvals.isPending || !(cases.data?.items.some((c) => c.is_active) ?? false)}
+            onClick={() => runEvals.mutate({ workflow_name: workflow })}
+          >
+            {runEvals.isPending ? 'Running…' : 'Run evals (active prompt)'}
+          </button>
+        </div>
+        {runEvals.isError && <ErrorState error={runEvals.error} />}
+
+        {cases.isPending && <Loading />}
+        {cases.data && cases.data.items.length === 0 && (
+          <p className="muted">No eval cases yet for this workflow — add the first one below.</p>
+        )}
+        {cases.data && cases.data.items.length > 0 && (
+          <table className="data">
+            <thead>
+              <tr><th>Case</th><th>Input</th><th>Expectations</th><th>Active</th><th></th></tr>
+            </thead>
+            <tbody>
+              {cases.data.items.map((c) => (
+                <tr key={c.id}>
+                  <td><strong>{c.name}</strong></td>
+                  <td className="muted" style={{ maxWidth: 320 }}>{c.input_json.primary_text.slice(0, 120)}</td>
+                  <td>
+                    {(c.expectations_json.contains ?? []).map((s) => (
+                      <span key={s} className="badge neutral" style={{ marginRight: 4 }}>contains "{s}"</span>
+                    ))}
+                    {c.expectations_json.min_confidence && (
+                      <span className="badge teal">≥ {c.expectations_json.min_confidence}</span>
+                    )}
+                  </td>
+                  <td>{c.is_active ? 'yes' : 'no'}</td>
+                  <td>
+                    <button className="btn sm ghost" disabled={setActive.isPending}
+                      onClick={() => setActive.mutate({ id: c.id, is_active: !c.is_active })}>
+                      {c.is_active ? 'Disable' : 'Enable'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {lastRun && (
+        <div className="panel">
+          <h2>
+            Latest run — {lastRun.passed_count}/{lastRun.passed_count + lastRun.failed_count} passed
+          </h2>
+          <p className="muted">
+            {lastRun.prompt_version} · {lastRun.model_provider}/{lastRun.model_name} ·{' '}
+            {fmtDate(lastRun.created_at)} · by {lastRun.created_by}
+          </p>
+          <table className="data">
+            <thead><tr><th>Case</th><th>Result</th><th>Confidence</th><th>Details</th></tr></thead>
+            <tbody>
+              {lastRun.results_json.map((r) => (
+                <tr key={r.case_id}>
+                  <td>{r.case_name}</td>
+                  <td>{r.passed ? <span className="badge green">pass</span> : <span className="badge red">fail</span>}</td>
+                  <td>{r.confidence ?? '—'}</td>
+                  <td className="muted" style={{ maxWidth: 380 }}>
+                    {r.passed ? r.content_preview.slice(0, 140) : r.failures.join('; ')}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {(runs.data?.items.length ?? 0) > 1 && (
+            <p className="muted">
+              History:{' '}
+              {runs.data!.items.slice(1, 6).map((r) => (
+                <span key={r.id} style={{ marginRight: 10 }}>
+                  {r.prompt_version}: {r.passed_count}/{r.passed_count + r.failed_count} ({fmtDate(r.created_at)})
+                </span>
+              ))}
+            </p>
+          )}
+        </div>
+      )}
+
+      <form
+        className="panel"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!form.name.trim() || !form.primary_text.trim()) return;
+          createCase.mutate(
+            {
+              workflow_name: workflow,
+              name: form.name.trim(),
+              primary_text: form.primary_text.trim(),
+              contains: form.contains.split(',').map((s) => s.trim()).filter(Boolean),
+              ...(form.min_confidence && {
+                min_confidence: form.min_confidence as 'HIGH' | 'MEDIUM' | 'LOW',
+              }),
+            },
+            { onSuccess: () => setForm({ name: '', primary_text: '', contains: '', min_confidence: '' }) },
+          );
+        }}
+      >
+        <h2>Add eval case — {titleCase(workflow)}</h2>
+        <label className="field">
+          Case name
+          <input type="text" value={form.name} placeholder="Paystub condition (synthetic)"
+            onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        </label>
+        <label className="field">
+          Input text <span className="hint">What an operator would type — synthetic content only, no borrower data.</span>
+          <textarea value={form.primary_text}
+            onChange={(e) => setForm({ ...form, primary_text: e.target.value })} />
+        </label>
+        <div className="row">
+          <label className="field grow">
+            Output must contain <span className="hint">Comma-separated phrases, e.g. "paystub, 30 days"</span>
+            <input type="text" value={form.contains}
+              onChange={(e) => setForm({ ...form, contains: e.target.value })} />
+          </label>
+          <label className="field">
+            Min confidence
+            <select value={form.min_confidence}
+              onChange={(e) => setForm({ ...form, min_confidence: e.target.value })}>
+              <option value="">none</option>
+              <option value="LOW">LOW</option>
+              <option value="MEDIUM">MEDIUM</option>
+              <option value="HIGH">HIGH</option>
+            </select>
+          </label>
+        </div>
+        {createCase.isError && <ErrorState error={createCase.error} />}
+        <button className="btn primary" disabled={createCase.isPending || !form.name.trim() || !form.primary_text.trim()}>
+          Add case
+        </button>
+      </form>
+    </div>
+  );
+}
+
 type RoutedProvider = 'mock' | 'anthropic' | 'openai' | 'deepseek';
 
 function ModelRoutingCell({ workflow }: { workflow: WorkflowInfo }) {
@@ -253,7 +419,7 @@ export function AdminPage() {
   const role = currentIdentity().role;
   const prompts = usePrompts();
   const workflows = useWorkflows();
-  const [tab, setTab] = useState<'prompts' | 'workflows' | 'companies'>('prompts');
+  const [tab, setTab] = useState<'prompts' | 'workflows' | 'evals' | 'companies'>('prompts');
 
   if (role !== 'admin') {
     return (
@@ -275,12 +441,16 @@ export function AdminPage() {
         <button className={`btn sm ${tab === 'workflows' ? 'dark' : 'ghost'}`} onClick={() => setTab('workflows')}>
           Workflow configs
         </button>
+        <button className={`btn sm ${tab === 'evals' ? 'dark' : 'ghost'}`} onClick={() => setTab('evals')}>
+          Evals
+        </button>
         <button className={`btn sm ${tab === 'companies' ? 'dark' : 'ghost'}`} onClick={() => setTab('companies')}>
           Companies
         </button>
       </div>
 
       {tab === 'companies' && <CompaniesTab />}
+      {tab === 'evals' && <EvalsTab workflows={workflows.data?.items ?? []} />}
 
       {tab === 'prompts' && (
         <>

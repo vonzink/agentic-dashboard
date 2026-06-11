@@ -383,6 +383,40 @@ export interface SearchHit {
   score: number;
 }
 
+/** Eval sets — saved test inputs per workflow (synthetic content only). */
+export interface EvalCase {
+  id: string;
+  workflow_name: string;
+  name: string;
+  input_json: { primary_text: string; source_text?: string | null };
+  expectations_json: { contains?: string[]; min_confidence?: ConfidenceLabel };
+  is_active: boolean;
+  created_by: string;
+  created_at: string;
+}
+
+export interface EvalCaseResult {
+  case_id: string;
+  case_name: string;
+  passed: boolean;
+  failures: string[];
+  confidence: ConfidenceLabel | null;
+  content_preview: string;
+}
+
+export interface EvalRun {
+  id: string;
+  workflow_name: string;
+  prompt_version: string;
+  model_provider: string;
+  model_name: string;
+  passed_count: number;
+  failed_count: number;
+  results_json: EvalCaseResult[];
+  created_by: string;
+  created_at: string;
+}
+
 /** GET /quality — reviewer-edit analytics (approval + edit rates). */
 export interface QualityBucket {
   decisions: number;
