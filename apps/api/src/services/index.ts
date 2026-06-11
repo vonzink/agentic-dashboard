@@ -8,6 +8,7 @@ import { AuditService } from './audit';
 import { CompanyService } from './companies';
 import { DocumentService } from './documents';
 import { LocalHashEmbedder, type EmbeddingProvider } from './embeddings';
+import { createNotifier, NotificationService, type Notifier } from './notifications';
 import { PromptService } from './prompts';
 import { QualityService } from './quality';
 import { RetrievalService } from './retrieval';
@@ -25,6 +26,7 @@ export interface Services {
   approvals: ApprovalService;
   actions: ActionService;
   quality: QualityService;
+  notifications: NotificationService;
   provider: ModelProvider;
   storage: BlobStorage;
   embedder: EmbeddingProvider;
@@ -33,7 +35,12 @@ export interface Services {
   config: AppConfig;
 }
 
-export function buildServices(store: Store, config: AppConfig, storage?: BlobStorage): Services {
+export function buildServices(
+  store: Store,
+  config: AppConfig,
+  storage?: BlobStorage,
+  notifier?: Notifier,
+): Services {
   const audit = new AuditService(store);
   const companies = new CompanyService(store, audit);
   const tasks = new TaskService(store, audit, companies);
@@ -43,12 +50,13 @@ export function buildServices(store: Store, config: AppConfig, storage?: BlobSto
   const documents = new DocumentService(store, audit, blobStorage, embedder, companies);
   const prompts = new PromptService(store, audit);
   const provider = createProvider(config, mockOutputFor);
-  const runs = new RunService(store, audit, tasks, prompts, provider, config, retrieval);
+  const notifications = new NotificationService(notifier ?? createNotifier(config), config.appBaseUrl);
+  const runs = new RunService(store, audit, tasks, prompts, provider, config, retrieval, notifications);
   const approvals = new ApprovalService(store, audit, config);
   const actions = new ActionService(store, audit, config);
   const quality = new QualityService(store);
   return {
-    audit, companies, tasks, documents, prompts, runs, approvals, actions, quality,
+    audit, companies, tasks, documents, prompts, runs, approvals, actions, quality, notifications,
     provider, storage: blobStorage, embedder, retrieval, store, config,
   };
 }

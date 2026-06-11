@@ -29,6 +29,19 @@ export interface AppConfig {
   requireDifferentReviewer: boolean;
   /** Master switch for executing integration actions. Off = propose-only mode. */
   integrationExecutionEnabled: boolean;
+  /** Recipients of review/failure/budget alert emails. Empty = log-only. */
+  notifyEmails: string[];
+  /** SMTP transport for notifications; null = log-only notifier. */
+  smtp: {
+    host: string;
+    port: number;
+    secure: boolean;
+    user: string | null;
+    pass: string | null;
+    from: string;
+  } | null;
+  /** Public dashboard URL used in notification links (e.g. https://agentic.zvzsolutions.com). */
+  appBaseUrl: string | null;
 }
 
 export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
@@ -59,6 +72,21 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     uploadDir: process.env.UPLOAD_DIR ?? '.data/uploads',
     requireDifferentReviewer: process.env.REQUIRE_DIFFERENT_REVIEWER === 'true',
     integrationExecutionEnabled: process.env.INTEGRATION_EXECUTION_ENABLED === 'true',
+    notifyEmails: (process.env.NOTIFY_EMAILS ?? '')
+      .split(',')
+      .map((e) => e.trim())
+      .filter(Boolean),
+    smtp: process.env.SMTP_HOST
+      ? {
+          host: process.env.SMTP_HOST,
+          port: Number(process.env.SMTP_PORT ?? 587),
+          secure: process.env.SMTP_SECURE === 'true',
+          user: process.env.SMTP_USER ?? null,
+          pass: process.env.SMTP_PASS ?? null,
+          from: process.env.SMTP_FROM ?? process.env.SMTP_USER ?? 'agentic-dashboard@localhost',
+        }
+      : null,
+    appBaseUrl: process.env.APP_BASE_URL ?? null,
     ...overrides,
   };
 

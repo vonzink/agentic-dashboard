@@ -7,6 +7,7 @@ import { WORKFLOWS } from '../workflows/registry';
 import { renderPrompt, runWorkflow, WorkflowOutputError } from '../workflows/runner';
 import type { SourceSnippet, WorkflowInput } from '../workflows/types';
 import type { AuditService } from './audit';
+import type { NotificationService } from './notifications';
 import type { PromptService } from './prompts';
 import type { RetrievalService } from './retrieval';
 import type { TaskService } from './tasks';
@@ -33,6 +34,7 @@ export class RunService {
     private provider: ModelProvider,
     private config: AppConfig,
     private retrieval: RetrievalService,
+    private notifications: NotificationService,
   ) {}
 
   /**
@@ -131,7 +133,7 @@ export class RunService {
 
       // Persist run result + output + citations + audit atomically. The model
       // call itself happens above, outside any transaction.
-      return await this.store.withTransaction(async (tx) => {
+      const persisted = await this.store.withTransaction(async (tx) => {
         const completedRun = await tx.runs.update(run.id, {
           status: 'succeeded',
           completed_at: new Date().toISOString(),
@@ -195,6 +197,21 @@ export class RunService {
 
         return { run: completedRun!, outputs: [{ ...output, citations }] };
       });
+
+      // Best-effort notifications after commit; failures never affect the run.
+      const output = persisted.outputs[0]!;
+      if (output.review_status === 'NEEDS_REVIEW') {
+        await this.notifications.outputNeedsReview({
+          taskTitle: task.title,
+          workflowName: def.name,
+          outputId: output.id,
+          confidence: result.confidence,
+          warningCount: result.warnings.length,
+        });
+      }
+      await this.checkBudgetThresholds(task.company_id, actor.email, Number(cost));
+
+      return persisted;
     } catch (err) {
       const message =
         err instanceof WorkflowOutputError
@@ -213,8 +230,57 @@ export class RunService {
         actor: actor.email,
         payload: { run_id: run.id, error: message },
       });
+      await this.notifications.runFailed({
+        taskTitle: task.title,
+        workflowName: def.name,
+        error: message,
+      });
       throw new ApiError(502, 'WORKFLOW_FAILED', `Workflow run failed: ${message}`);
     }
+  }
+
+  /**
+   * Sends a one-time alert when this run's cost pushed the company's
+   * month-to-date spend across the 80% or 100% mark of its monthly budget.
+   * Soft limit only — nothing is ever blocked. The crossing is also audited.
+   */
+  private async checkBudgetThresholds(
+    companyId: string,
+    actor: string,
+    runCost: number,
+  ): Promise<void> {
+    if (runCost <= 0) return;
+    const company = await this.store.companies.get(companyId);
+    const budget = company?.monthly_budget === null ? null : Number(company?.monthly_budget);
+    if (!company || !budget || budget <= 0) return;
+
+    const now = new Date();
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+    const usage = await this.store.runs.usageSummary(monthStart, companyId);
+    const spend = Number(usage.totals.estimated_cost);
+    const ratio = spend / budget;
+    const previousRatio = (spend - runCost) / budget;
+
+    const crossed = [1, 0.8].find((t) => ratio >= t && previousRatio < t);
+    if (crossed === undefined) return;
+
+    await this.audit.record('budget.threshold_crossed', {
+      companyId,
+      actor,
+      payload: {
+        threshold: crossed,
+        ratio: Number(ratio.toFixed(4)),
+        monthly_budget: company.monthly_budget,
+        month_to_date: spend.toFixed(6),
+      },
+    });
+    await this.notifications.budgetThreshold({
+      companyName: company.name,
+      threshold: crossed,
+      ratio,
+      monthlyBudget: company.monthly_budget!,
+      monthToDate: spend.toFixed(6),
+    });
   }
 
   /** Builds the WorkflowInput from task inputs + selected source chunks. */

@@ -25,6 +25,15 @@ export class MemoryBlobStorage implements BlobStorage {
  * in-memory blob storage. All fixture data is synthetic — never borrower
  * production data.
  */
+/** Captures notifications in-memory so tests can assert on them. */
+export class CaptureNotifier {
+  readonly kind = 'capture';
+  events: { type: string; subject: string; body: string }[] = [];
+  async send(event: { type: string; subject: string; body: string }): Promise<void> {
+    this.events.push(event);
+  }
+}
+
 export async function buildTestApp(overrides: Partial<AppConfig> = {}) {
   const config = loadConfig({
     env: 'local',
@@ -34,13 +43,16 @@ export async function buildTestApp(overrides: Partial<AppConfig> = {}) {
     anthropicApiKey: null,
     requireDifferentReviewer: false,
     integrationExecutionEnabled: false,
+    smtp: null,
+    appBaseUrl: null,
     ...overrides,
   });
   const store = new MemoryStore();
   await seedDefaults(store);
   const storage = new MemoryBlobStorage();
-  const { app, services } = buildApp(store, config, { storage });
-  return { app, store, services, config, storage };
+  const notifier = new CaptureNotifier();
+  const { app, services } = buildApp(store, config, { storage, notifier });
+  return { app, store, services, config, storage, notifier };
 }
 
 export const as = {
