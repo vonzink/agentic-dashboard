@@ -1,6 +1,6 @@
 import type { AppConfig } from '../config';
 import type { Store } from '../repositories/interfaces';
-import { createProvider, type ModelProvider } from '../workflows/providers';
+import { createProvider, ProviderRegistry, type ModelProvider } from '../workflows/providers';
 import { mockOutputFor } from '../workflows/registry';
 import { ActionService } from './actions';
 import { ApprovalService } from './approvals';
@@ -50,8 +50,9 @@ export function buildServices(
   const documents = new DocumentService(store, audit, blobStorage, embedder, companies);
   const prompts = new PromptService(store, audit);
   const provider = createProvider(config, mockOutputFor);
+  const providerRegistry = new ProviderRegistry(config, mockOutputFor, provider);
   const notifications = new NotificationService(notifier ?? createNotifier(config), config.appBaseUrl);
-  const runs = new RunService(store, audit, tasks, prompts, provider, config, retrieval, notifications);
+  const runs = new RunService(store, audit, tasks, prompts, providerRegistry, config, retrieval, notifications);
   const approvals = new ApprovalService(store, audit, config);
   const actions = new ActionService(store, audit, config);
   const quality = new QualityService(store);

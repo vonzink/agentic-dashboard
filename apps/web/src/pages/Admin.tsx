@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useCompanies, useCreateCompany, useCreatePrompt, usePrompts, useSetPromptActive, useUpdateCompany, useWorkflows } from '../api/hooks';
-import type { PromptTemplate } from '../api/types';
+import { useCompanies, useCreateCompany, useCreatePrompt, usePrompts, useSetPromptActive, useUpdateCompany, useUpdateWorkflow, useWorkflows } from '../api/hooks';
+import type { PromptTemplate, WorkflowInfo } from '../api/types';
 import { Badge } from '../components/Badge';
 import { EmptyState, ErrorState, Loading } from '../components/States';
 import { currentIdentity } from '../lib/identity';
@@ -197,6 +197,58 @@ function CompaniesTab() {
   );
 }
 
+type RoutedProvider = 'mock' | 'anthropic' | 'openai' | 'deepseek';
+
+function ModelRoutingCell({ workflow }: { workflow: WorkflowInfo }) {
+  const update = useUpdateWorkflow();
+  const mc = (workflow.model_config_json ?? {}) as { provider?: RoutedProvider; model?: string };
+  return (
+    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+      <select
+        value={mc.provider ?? ''}
+        disabled={update.isPending}
+        onChange={(e) => {
+          const provider = e.target.value as RoutedProvider | '';
+          update.mutate({
+            name: workflow.workflow_name,
+            model_config_json: provider ? { provider } : {},
+          });
+        }}
+      >
+        <option value="">default</option>
+        <option value="mock">mock (free)</option>
+        <option value="anthropic">Claude</option>
+        <option value="openai">ChatGPT</option>
+        <option value="deepseek">DeepSeek</option>
+      </select>
+      {mc.provider && (
+        <button
+          className="btn sm ghost"
+          disabled={update.isPending}
+          title="Set a specific model id (blank = the provider's default)"
+          onClick={() => {
+            const raw = window.prompt(
+              `Model id for ${mc.provider} (blank = provider default):`,
+              mc.model ?? '',
+            );
+            if (raw === null) return;
+            update.mutate({
+              name: workflow.workflow_name,
+              model_config_json: {
+                provider: mc.provider,
+                ...(raw.trim() ? { model: raw.trim() } : {}),
+              },
+            });
+          }}
+        >
+          {mc.model ?? 'default model'}
+        </button>
+      )}
+      {update.isError && <ErrorState error={update.error} />}
+    </div>
+  );
+}
+
 export function AdminPage() {
   const role = currentIdentity().role;
   const prompts = usePrompts();
@@ -248,7 +300,7 @@ export function AdminPage() {
           {workflows.data && (
             <table className="data">
               <thead>
-                <tr><th>Workflow</th><th>Task type</th><th>Requires approval</th><th>Active</th><th>Implemented</th></tr>
+                <tr><th>Workflow</th><th>Task type</th><th>Requires approval</th><th>Active</th><th>Model</th></tr>
               </thead>
               <tbody>
                 {workflows.data.items.map((w) => (
@@ -257,7 +309,7 @@ export function AdminPage() {
                     <td>{titleCase(w.task_type)}</td>
                     <td>{w.requires_approval ? <Badge value="APPROVED" prefix="" /> : <Badge value="REJECTED" prefix="" />}</td>
                     <td>{w.is_active ? 'yes' : 'no'}</td>
-                    <td>{w.implemented ? 'yes' : 'planned'}</td>
+                    <td><ModelRoutingCell workflow={w} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -265,7 +317,9 @@ export function AdminPage() {
           )}
           <p className="muted">
             Approval requirements are enforced server-side regardless of this display; in the MVP
-            every output requires human review.
+            every output requires human review. "Model" routes a workflow to a specific provider —
+            e.g. a cheap model for checklists, Claude for drafting — overriding the deployment
+            default. Runs against a provider with no API key configured fail loudly.
           </p>
         </div>
       )}

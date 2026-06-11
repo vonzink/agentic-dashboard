@@ -51,6 +51,25 @@ export function useWorkflows() {
   });
 }
 
+export function useUpdateWorkflow() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      name,
+      ...body
+    }: {
+      name: string;
+      requires_approval?: boolean;
+      is_active?: boolean;
+      model_config_json?: {
+        provider?: 'mock' | 'anthropic' | 'openai' | 'deepseek';
+        model?: string;
+      };
+    }) => apiFetch<WorkflowInfo>(`/workflows/${name}`, { method: 'PATCH', body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['workflows'] }),
+  });
+}
+
 export function useWorkflowGraphs() {
   return useQuery({
     queryKey: ['workflows', 'graph'],

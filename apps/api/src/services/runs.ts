@@ -2,7 +2,7 @@ import { ApiError } from '../middleware/error';
 import type { AppConfig } from '../config';
 import type { Store } from '../repositories/interfaces';
 import type { AiOutput, AuthUser, TaskRun } from '../types/domain';
-import type { ModelProvider } from '../workflows/providers';
+import type { ModelProvider, ProviderRegistry } from '../workflows/providers';
 import { WORKFLOWS } from '../workflows/registry';
 import { renderPrompt, runWorkflow, WorkflowOutputError } from '../workflows/runner';
 import type { SourceSnippet, WorkflowInput } from '../workflows/types';
@@ -31,7 +31,7 @@ export class RunService {
     private audit: AuditService,
     private tasks: TaskService,
     private prompts: PromptService,
-    private provider: ModelProvider,
+    private providers: ProviderRegistry,
     private config: AppConfig,
     private retrieval: RetrievalService,
     private notifications: NotificationService,
@@ -54,6 +54,19 @@ export class RunService {
     const wfConfig = await this.store.workflowConfigs.getByName(workflowName);
     if (wfConfig && !wfConfig.is_active) {
       throw ApiError.conflict('WORKFLOW_DISABLED', `Workflow '${workflowName}' is disabled`);
+    }
+
+    // Per-workflow model routing: model_config_json overrides the default
+    // provider (e.g. a cheap model for classification, Claude for drafting).
+    // A configured provider with no key fails the request here, loudly.
+    let provider: ModelProvider;
+    try {
+      provider = this.providers.resolve(wfConfig?.model_config_json);
+    } catch (err) {
+      throw ApiError.conflict(
+        'PROVIDER_NOT_CONFIGURED',
+        `Workflow '${workflowName}' model config is unusable: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
 
     const company = await this.store.companies.get(task.company_id);
@@ -91,8 +104,8 @@ export class RunService {
       task_id: taskId,
       workflow_name: def.name,
       langgraph_run_id: null,
-      model_provider: this.provider.name,
-      model_name: this.provider.model,
+      model_provider: provider.name,
+      model_name: provider.model,
       prompt_version: prompt.version,
       status: 'running',
       requested_by: actor.email,
@@ -113,17 +126,17 @@ export class RunService {
         run_id: run.id,
         workflow: def.name,
         prompt_version: prompt.version,
-        provider: this.provider.name,
-        model: this.provider.model,
+        provider: provider.name,
+        model: provider.model,
         source_count: input.sources.length,
       },
     });
 
     try {
-      const result = await runWorkflow(def, this.provider, prompt, input);
+      const result = await runWorkflow(def, provider, prompt, input);
 
       const cost =
-        this.provider.name === 'mock'
+        provider.name === 'mock'
           ? '0'
           : (
               (result.tokens.input * this.config.costPerMTokIn +

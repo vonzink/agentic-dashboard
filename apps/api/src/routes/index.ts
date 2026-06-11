@@ -25,6 +25,7 @@ import {
   updateCompanyBody,
   updatePromptBody,
   updateTaskBody,
+  updateWorkflowBody,
   usageQuery,
   uploadDocumentFields,
 } from '../types/dto';
@@ -78,6 +79,27 @@ export function buildRouter(s: Services): Router {
       };
     });
     res.json({ items });
+  });
+
+  // Admin tuning: approval requirement, on/off switch, and per-workflow
+  // model routing ({ provider, model } overrides the deployment default).
+  r.patch('/workflows/:name', requireRole('admin'), async (req, res) => {
+    const body = updateWorkflowBody.parse(req.body);
+    const existing = await s.store.workflowConfigs.getByName(param(req, 'name'));
+    if (!existing) throw ApiError.notFound('Workflow');
+    const updated = await s.store.workflowConfigs.upsert({
+      workflow_name: existing.workflow_name,
+      task_type: existing.task_type,
+      requires_approval: body.requires_approval ?? existing.requires_approval,
+      allowed_tools_json: existing.allowed_tools_json,
+      model_config_json: body.model_config_json ?? existing.model_config_json,
+      is_active: body.is_active ?? existing.is_active,
+    });
+    await s.audit.record('workflow.updated', {
+      actor: currentUser(req).email,
+      payload: { workflow_name: existing.workflow_name, patch: body },
+    });
+    res.json({ ...updated, implemented: !!WORKFLOWS[updated.workflow_name] });
   });
 
   // Pipeline structure for the Workflows visualization page. Generated from

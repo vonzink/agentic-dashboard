@@ -125,25 +125,80 @@ export class OpenAICompatibleProvider implements ModelProvider {
   }
 }
 
-export function createProvider(
+export type ProviderName = AppConfig['modelProvider'];
+
+export const PROVIDER_NAMES: ProviderName[] = ['mock', 'anthropic', 'openai', 'deepseek'];
+
+/**
+ * Builds one provider by name, with an optional model override (used by
+ * per-workflow routing). Throws when the provider's key isn't configured —
+ * callers decide whether that's a startup error or a per-run failure.
+ */
+export function createProviderFor(
   config: AppConfig,
   mockFor: (workflowName: string, input: WorkflowInput) => Record<string, unknown>,
+  name: ProviderName,
+  modelOverride?: string,
 ): ModelProvider {
-  switch (config.modelProvider) {
+  switch (name) {
     case 'anthropic':
       if (!config.anthropicApiKey) throw new Error('ANTHROPIC_API_KEY is required');
-      return new AnthropicModelProvider(config.anthropicApiKey, config.anthropicModel);
+      return new AnthropicModelProvider(
+        config.anthropicApiKey,
+        modelOverride ?? config.anthropicModel,
+      );
     case 'openai':
       if (!config.openaiApiKey) throw new Error('OPENAI_API_KEY is required');
       return new OpenAICompatibleProvider(
-        'openai', 'https://api.openai.com/v1', config.openaiApiKey, config.openaiModel,
+        'openai', 'https://api.openai.com/v1', config.openaiApiKey,
+        modelOverride ?? config.openaiModel,
       );
     case 'deepseek':
       if (!config.deepseekApiKey) throw new Error('DEEPSEEK_API_KEY is required');
       return new OpenAICompatibleProvider(
-        'deepseek', 'https://api.deepseek.com/v1', config.deepseekApiKey, config.deepseekModel,
+        'deepseek', 'https://api.deepseek.com/v1', config.deepseekApiKey,
+        modelOverride ?? config.deepseekModel,
       );
     default:
       return new MockModelProvider(mockFor);
+  }
+}
+
+export function createProvider(
+  config: AppConfig,
+  mockFor: (workflowName: string, input: WorkflowInput) => Record<string, unknown>,
+): ModelProvider {
+  return createProviderFor(config, mockFor, config.modelProvider);
+}
+
+/**
+ * Per-run provider resolution: a workflow's model_config_json
+ * ({ provider, model }) overrides the deployment default. Instances are
+ * cached per (provider, model) pair. A configured-but-keyless provider
+ * throws — the run fails loudly instead of silently using another model.
+ */
+export class ProviderRegistry {
+  private cache = new Map<string, ModelProvider>();
+
+  constructor(
+    private config: AppConfig,
+    private mockFor: (workflowName: string, input: WorkflowInput) => Record<string, unknown>,
+    private fallback: ModelProvider,
+  ) {}
+
+  resolve(modelConfig: Record<string, unknown> | null | undefined): ModelProvider {
+    const name = modelConfig?.provider;
+    if (typeof name !== 'string' || !name) return this.fallback;
+    if (!PROVIDER_NAMES.includes(name as ProviderName)) {
+      throw new Error(`Unknown provider '${name}' in workflow model config`);
+    }
+    const model = typeof modelConfig?.model === 'string' ? modelConfig.model : undefined;
+    const key = `${name}:${model ?? ''}`;
+    let provider = this.cache.get(key);
+    if (!provider) {
+      provider = createProviderFor(this.config, this.mockFor, name as ProviderName, model);
+      this.cache.set(key, provider);
+    }
+    return provider;
   }
 }

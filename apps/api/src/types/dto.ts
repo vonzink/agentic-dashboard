@@ -108,6 +108,22 @@ export const updateCompanyBody = z
 
 export const budgetQuery = z.object({ company_id: z.uuid().optional() });
 
+/** PATCH /workflows/:name — admin tuning of a workflow's config.
+ * model_config_json replaces the whole object; {} clears routing. */
+export const updateWorkflowBody = z
+  .object({
+    requires_approval: z.boolean(),
+    is_active: z.boolean(),
+    model_config_json: z
+      .object({
+        provider: z.enum(['mock', 'anthropic', 'openai', 'deepseek']).optional(),
+        model: z.string().min(1).max(200).optional(),
+      })
+      .strict(),
+  })
+  .partial()
+  .refine((b) => Object.keys(b).length > 0, { message: 'empty patch' });
+
 export const approveBody = z.object({
   reviewer_notes: z.string().max(5_000).nullish(),
   edited_final_content: z.string().max(100_000).nullish(),
