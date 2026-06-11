@@ -273,6 +273,30 @@ export interface WorkflowConfig {
 
 export type WorkflowInfo = WorkflowConfig & { implemented: boolean; description: string };
 
+/** GET /workflows/graph — pipeline structure for the Workflows page. */
+export type StageKind = 'human' | 'system' | 'ai' | 'check' | 'gate';
+
+export interface WorkflowStage {
+  id: string;
+  label: string;
+  detail: string;
+  kind: StageKind;
+  optional?: boolean;
+  source: 'langgraph' | 'service';
+}
+
+export interface WorkflowGraph {
+  workflow_name: string;
+  task_type: TaskType;
+  description: string;
+  output_type: string;
+  requires_approval: boolean;
+  is_active: boolean;
+  stages: WorkflowStage[];
+  guardrails: string[];
+  output_fields: { name: string; type: string; required: boolean }[];
+}
+
 export type ActionStatus =
   | 'proposed'
   | 'approved'

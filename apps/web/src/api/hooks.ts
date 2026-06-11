@@ -24,6 +24,7 @@ import type {
   UsageSummary,
   TaskDetail,
   TaskInput,
+  WorkflowGraph,
   WorkflowInfo,
 } from './types';
 
@@ -44,6 +45,14 @@ export function useWorkflows() {
   return useQuery({
     queryKey: ['workflows'],
     queryFn: () => apiFetch<{ items: WorkflowInfo[] }>('/workflows'),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useWorkflowGraphs() {
+  return useQuery({
+    queryKey: ['workflows', 'graph'],
+    queryFn: () => apiFetch<{ items: WorkflowGraph[] }>('/workflows/graph'),
     staleTime: 5 * 60_000,
   });
 }

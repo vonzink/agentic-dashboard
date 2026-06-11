@@ -62,6 +62,23 @@ const run = {
 const ROUTES: [RegExp, () => unknown][] = [
   [/^\/health/, () => ({ status: 'ok', db: 'skipped', provider: { name: 'mock', configured: true }, version: 'mock' })],
   [/^\/companies/, () => ({ items: [{ id: id(9), name: 'Mock Client Co', slug: 'mock', is_active: true, created_at: now }] })],
+  // Must precede /^\/workflows/ — that pattern also matches this path.
+  [/^\/workflows\/graph/, () => ({
+    items: [{
+      workflow_name: 'condition_response_draft', task_type: 'condition_response',
+      description: 'Mock workflow', output_type: 'draft_response',
+      requires_approval: true, is_active: true,
+      stages: [
+        { id: 'task_input', label: 'Task created', detail: 'An operator describes the request. (mock)', kind: 'human', source: 'service' },
+        { id: 'generate', label: 'Model call', detail: 'The only step that talks to the LLM. (mock)', kind: 'ai', source: 'langgraph' },
+        { id: 'parse_validate', label: 'Parse & validate', detail: 'Strict JSON + schema match. (mock)', kind: 'check', source: 'langgraph' },
+        { id: 'assess', label: 'Guardrail checks', detail: 'Warnings and confidence. (mock)', kind: 'check', source: 'langgraph' },
+        { id: 'human_review', label: 'Human review gate', detail: 'Nothing ships without this step. (mock)', kind: 'gate', source: 'service' },
+      ],
+      guardrails: ['Mock guardrail'],
+      output_fields: [{ name: 'summary', type: 'string', required: true }],
+    }],
+  })],
   [/^\/workflows/, () => ({
     items: [{
       id: id(5), workflow_name: 'condition_response_draft', task_type: 'condition_response',

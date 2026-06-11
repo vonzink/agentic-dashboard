@@ -134,6 +134,35 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--msfg-green)
 ul.tight { margin: 6px 0; padding-left: 20px; }
 ul.tight li { margin: 3px 0; }
 
+/* ---- workflow pipeline diagram ---- */
+.flow { display: flex; flex-wrap: wrap; gap: 6px; align-items: stretch; margin: 14px 0; }
+.flow-node {
+  border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px;
+  width: 168px; background: #fafbfa; display: flex; flex-direction: column;
+}
+.flow-node .k { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+.flow-node .t { font-weight: 700; font-size: 12px; margin: 2px 0 4px; }
+.flow-node .d { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+.flow-node.human { border-color: var(--msfg-teal); background: #f0f5f5; }
+.flow-node.ai { border-color: var(--msfg-green-dark); background: #f3f9eb; }
+.flow-node.ai .k { color: var(--msfg-green-dark); }
+.flow-node.check { background: var(--warn-bg); border-color: var(--warn-border); }
+.flow-node.check .k { color: var(--warn-text); }
+.flow-node.gate { border: 2px solid var(--msfg-teal); background: #e0ecec; }
+.flow-node.gate .k { color: var(--msfg-teal); font-weight: 700; }
+.flow-node.optional { border-style: dashed; }
+.flow-arrow { align-self: center; color: var(--text-muted); font-size: 15px; user-select: none; }
+
+.wf-list { display: flex; flex-direction: column; gap: 2px; }
+.wf-item {
+  text-align: left; padding: 8px 10px; border: none; border-left: 3px solid transparent;
+  border-radius: 0 6px 6px 0; background: transparent; font: inherit; font-size: 13px;
+  color: var(--text); cursor: pointer; text-transform: capitalize;
+  display: flex; align-items: center; gap: 6px;
+}
+.wf-item:hover { background: #f2f7ee; }
+.wf-item.active { border-left-color: var(--msfg-green); background: #eef5e4; font-weight: 600; }
+
 /* ---- timeline ---- */
 .timeline { list-style: none; margin: 0; padding: 0; }
 .timeline li { position: relative; padding: 0 0 14px 22px; border-left: 2px solid var(--border); margin-left: 8px; }

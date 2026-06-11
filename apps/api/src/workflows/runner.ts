@@ -32,8 +32,11 @@ const RunState = Annotation.Root({
  * Deliberately linear and tool-free: graphs can only draft. Anything that
  * touches the outside world lives behind the approval gate in the service
  * layer, not in here.
+ *
+ * Exported so describe.ts can extract the real topology (via getGraph())
+ * for the Workflows visualization page — diagrams never go stale.
  */
-function buildGraph(def: WorkflowDefinition, provider: ModelProvider) {
+export function buildGraph(def: WorkflowDefinition, provider: ModelProvider) {
   return new StateGraph(RunState)
     .addNode('generate', async (state) => {
       const response = await provider.complete({

@@ -27,6 +27,7 @@ import {
   usageQuery,
   uploadDocumentFields,
 } from '../types/dto';
+import { describeWorkflows } from '../workflows/describe';
 import { PLANNED_WORKFLOWS, WORKFLOWS } from '../workflows/registry';
 
 /**
@@ -76,6 +77,13 @@ export function buildRouter(s: Services): Router {
       };
     });
     res.json({ items });
+  });
+
+  // Pipeline structure for the Workflows visualization page. Generated from
+  // the live definitions (LangGraph topology + zod schemas) — never stale.
+  r.get('/workflows/graph', requireRole('viewer'), async (_req, res) => {
+    const configs = await s.store.workflowConfigs.list();
+    res.json({ items: describeWorkflows(configs) });
   });
 
   r.get('/integrations/status', requireRole('viewer'), (_req, res) => {

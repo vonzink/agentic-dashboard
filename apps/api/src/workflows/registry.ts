@@ -34,6 +34,10 @@ export const conditionResponseDraft: WorkflowDefinition = {
   description: 'Summarizes an underwriting condition and drafts a response for review',
   outputType: 'draft_response',
   outputSchema: conditionResponseSchema,
+  guardrails: [
+    'Drafts produced without source documents are flagged and capped at MEDIUM confidence',
+    'Drafts that cite none of the provided sources are flagged for manual verification',
+  ],
   buildUserContext: (input) => renderSources(input.sources),
   mainContent: (s) => str(s.draft_response),
   mockOutput: (input) => ({
@@ -68,6 +72,10 @@ export const borrowerEmailDraft: WorkflowDefinition = {
   description: 'Drafts a borrower-friendly document-request email (never sent automatically)',
   outputType: 'email_draft',
   outputSchema: borrowerEmailSchema,
+  guardrails: [
+    'Wording that states or implies an approval, denial, guarantee, or rate commitment is flagged',
+    'Emails are never sent automatically — a human copies the approved draft into their own mail client',
+  ],
   buildUserContext: (input) => renderSources(input.sources),
   mainContent: (s) => `Subject: ${str(s.email_subject)}\n\n${str(s.email_body)}`,
   mockOutput: (input) => ({
@@ -99,6 +107,9 @@ export const documentChecklistBuilder: WorkflowDefinition = {
   description: 'Builds an initial borrower document checklist for a loan scenario',
   outputType: 'checklist',
   outputSchema: documentChecklistSchema,
+  guardrails: [
+    'Checklists are advisory — lender and investor overlays must be confirmed by staff before use',
+  ],
   buildUserContext: (input) => renderSources(input.sources),
   mainContent: (s) => {
     const docs = Array.isArray(s.documents) ? s.documents : [];
@@ -135,6 +146,11 @@ export const sopLookupAnswer: WorkflowDefinition = {
   description: 'Answers internal SOP/guideline questions strictly from provided sources, with citations',
   outputType: 'answer',
   outputSchema: sopLookupSchema,
+  guardrails: [
+    'Answers with no SOP/guideline sources are forced to LOW confidence and marked unreliable',
+    'Answers that cite no sources are flagged as unverified',
+    'Thin source material (single short excerpt) is flagged for verification against the full document',
+  ],
   buildUserContext: (input) => renderSources(input.sources),
   mainContent: (s) => str(s.answer),
   mockOutput: (input) => ({
@@ -185,6 +201,10 @@ function makeFileReviewAgent(opts: {
     description: opts.description,
     outputType: 'summary',
     outputSchema: fileReviewSchema,
+    guardrails: [
+      'Reviews are advisory only — every output warns that underwriting and lending decisions stay with licensed staff',
+      'Reviews produced without source documents are flagged and capped at LOW confidence',
+    ],
     buildUserContext: (input) => renderSources(input.sources),
     mainContent: (s) => {
       const lines = [str(s.summary)];
@@ -276,6 +296,12 @@ export const websiteQa: WorkflowDefinition = {
     'Drafts public-facing answers to website mortgage questions from approved content, with citations and a mandatory disclaimer (human-published only)',
   outputType: 'answer',
   outputSchema: websiteQaSchema,
+  guardrails: [
+    'Rate, approval, or guarantee wording is detected and flagged — public answers must never make commitments',
+    'A consumer disclaimer is mandatory; answers missing it are forced to LOW confidence',
+    'Answers without approved source content are forced to LOW confidence and must not be published',
+    'Nothing is posted automatically — a human reviews and publishes every answer',
+  ],
   buildUserContext: (input) => renderSources(input.sources),
   mainContent: (s) => `${str(s.answer)}\n\n${str(s.disclaimer)}`,
   mockOutput: (input) => ({

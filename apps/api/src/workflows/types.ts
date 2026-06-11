@@ -128,6 +128,9 @@ export interface WorkflowDefinition {
   description: string;
   outputType: OutputType;
   outputSchema: z.ZodType<Record<string, unknown>>;
+  /** Plain-language summary of this workflow's `assess` checks, shown on the
+   * Workflows visualization page. Keep in sync with `assess` below. */
+  guardrails: string[];
   /** Renders the user prompt body from the assembled input. */
   buildUserContext(input: WorkflowInput): string;
   /** Main text extraction for ai_outputs.content. */

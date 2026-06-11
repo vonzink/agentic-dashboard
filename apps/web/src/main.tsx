@@ -12,6 +12,7 @@ import { DocumentsPage } from './pages/Documents';
 import { NewTaskPage } from './pages/NewTask';
 import { TaskDetailPage } from './pages/TaskDetail';
 import { TasksPage } from './pages/Tasks';
+import { WorkflowsPage } from './pages/Workflows';
 import './styles.css';
 
 const queryClient = new QueryClient({
@@ -28,6 +29,7 @@ const router = createBrowserRouter([
       { path: 'tasks/new', element: <NewTaskPage /> },
       { path: 'tasks/:id', element: <TaskDetailPage /> },
       { path: 'approvals', element: <ApprovalsPage /> },
+      { path: 'workflows', element: <WorkflowsPage /> },
       { path: 'documents', element: <DocumentsPage /> },
       { path: 'audit', element: <AuditLogPage /> },
       { path: 'admin', element: <AdminPage /> },
