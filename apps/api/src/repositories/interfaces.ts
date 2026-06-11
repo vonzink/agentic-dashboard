@@ -16,6 +16,7 @@ import type {
 } from '../types/domain';
 import type {
   ActionStatus,
+  ApprovalDecision,
   ReviewStatus,
   RunStatus,
   TaskPriority,
@@ -78,6 +79,15 @@ export interface UsageSummary {
     estimated_cost: string;
   }[];
   by_day: { day: string; runs: number; estimated_cost: string }[];
+}
+
+/** A review decision joined with the reviewed output, for quality reporting. */
+export interface ReviewDecisionRow {
+  decision: ApprovalDecision;
+  reviewed_at: string;
+  edited_final_content: string | null;
+  output_content: string;
+  workflow_name: string;
 }
 
 /** A chunk + its retrieval vector (kept off the SourceChunk API type). */
@@ -160,6 +170,9 @@ export interface Store {
     listByOutput(outputId: string): Promise<Approval[]>;
     listByTask(taskId: string): Promise<Approval[]>;
     get(id: string): Promise<Approval | null>;
+    /** Decisions at/after `sinceIso` with the reviewed output's content and
+     * workflow, optionally for one company. Powers reviewer-edit analytics. */
+    listDecisionsSince(sinceIso: string, companyId?: string): Promise<ReviewDecisionRow[]>;
   };
   audit: {
     append(e: NewAuditEvent): Promise<AuditEvent>;

@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuditLog, useHealth, useReviewQueue, useTasks, useUsage, useWorkflows } from '../api/hooks';
+import { useAuditLog, useHealth, useQuality, useReviewQueue, useTasks, useUsage, useWorkflows } from '../api/hooks';
 import { ErrorState, Loading } from '../components/States';
 import { activeCompanyId } from '../lib/company';
 import { fmtCost, fmtDate, titleCase } from '../lib/format';
@@ -12,6 +12,7 @@ export function DashboardPage() {
   const health = useHealth();
   const workflows = useWorkflows();
   const usage = useUsage(30, activeCompanyId() ?? undefined);
+  const quality = useQuality(30, activeCompanyId() ?? undefined);
 
   if (openTasks.isError) {
     return <ErrorState error={openTasks.error} onRetry={() => openTasks.refetch()} />;
@@ -85,6 +86,49 @@ export function DashboardPage() {
                 </tbody>
               </table>
             )}
+          </>
+        )}
+      </div>
+
+      <div className="panel" style={{ marginTop: 16 }}>
+        <h2>AI quality — last 30 days</h2>
+        {quality.isPending && <Loading />}
+        {quality.data && quality.data.totals.decisions === 0 && (
+          <p className="muted">No reviews yet — quality metrics appear once outputs are reviewed.</p>
+        )}
+        {quality.data && quality.data.totals.decisions > 0 && (
+          <>
+            <p className="muted">
+              {quality.data.totals.decisions} review(s) ·{' '}
+              {Math.round((quality.data.totals.approved / quality.data.totals.decisions) * 100)}%
+              approved · {quality.data.totals.approved_with_edits} approved with edits · avg edit{' '}
+              {Math.round(quality.data.totals.avg_edit_ratio * 100)}% of the draft
+            </p>
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>Workflow</th><th>Reviews</th><th>Approved</th><th>Rejected</th>
+                  <th>Changes req.</th><th>Edited on approve</th><th>Avg edit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {quality.data.by_workflow.map((w) => (
+                  <tr key={w.workflow_name}>
+                    <td>{titleCase(w.workflow_name)}</td>
+                    <td>{w.decisions}</td>
+                    <td>{w.approved}</td>
+                    <td>{w.rejected}</td>
+                    <td>{w.changes_requested}</td>
+                    <td>{w.approved_with_edits}</td>
+                    <td>{Math.round(w.avg_edit_ratio * 100)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="muted" style={{ fontSize: 12, marginBottom: 0 }}>
+              "Avg edit" compares each AI draft to the reviewer's final version — low numbers mean
+              the agent's drafts are landing close to publish-ready.
+            </p>
           </>
         )}
       </div>

@@ -15,6 +15,7 @@ import type {
   OutputDetail,
   Paginated,
   PromptTemplate,
+  QualitySummary,
   ReviewQueueItem,
   RunResponse,
   SearchHit,
@@ -374,6 +375,14 @@ export function useChunkSearch(q: string, k = 5, companyId?: string) {
 }
 
 // ---------- usage / cost ----------
+
+export function useQuality(days = 30, companyId?: string) {
+  return useQuery({
+    queryKey: ['quality', days, companyId],
+    queryFn: () => apiFetch<QualitySummary>('/quality', { query: { days, company_id: companyId } }),
+    staleTime: 60_000,
+  });
+}
 
 export function useUsage(days = 30, companyId?: string) {
   return useQuery({

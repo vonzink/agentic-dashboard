@@ -9,6 +9,7 @@ import { CompanyService } from './companies';
 import { DocumentService } from './documents';
 import { LocalHashEmbedder, type EmbeddingProvider } from './embeddings';
 import { PromptService } from './prompts';
+import { QualityService } from './quality';
 import { RetrievalService } from './retrieval';
 import { RunService } from './runs';
 import { createStorage, type BlobStorage } from './storage';
@@ -23,6 +24,7 @@ export interface Services {
   runs: RunService;
   approvals: ApprovalService;
   actions: ActionService;
+  quality: QualityService;
   provider: ModelProvider;
   storage: BlobStorage;
   embedder: EmbeddingProvider;
@@ -44,8 +46,9 @@ export function buildServices(store: Store, config: AppConfig, storage?: BlobSto
   const runs = new RunService(store, audit, tasks, prompts, provider, config, retrieval);
   const approvals = new ApprovalService(store, audit, config);
   const actions = new ActionService(store, audit, config);
+  const quality = new QualityService(store);
   return {
-    audit, companies, tasks, documents, prompts, runs, approvals, actions,
+    audit, companies, tasks, documents, prompts, runs, approvals, actions, quality,
     provider, storage: blobStorage, embedder, retrieval, store, config,
   };
 }

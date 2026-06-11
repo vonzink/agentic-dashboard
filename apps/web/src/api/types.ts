@@ -371,6 +371,24 @@ export interface SearchHit {
   score: number;
 }
 
+/** GET /quality — reviewer-edit analytics (approval + edit rates). */
+export interface QualityBucket {
+  decisions: number;
+  approved: number;
+  rejected: number;
+  changes_requested: number;
+  approved_with_edits: number;
+  /** 0 = approved untouched, 1 = fully rewritten (avg across approvals). */
+  avg_edit_ratio: number;
+}
+
+export interface QualitySummary {
+  days: number;
+  since: string;
+  totals: QualityBucket;
+  by_workflow: ({ workflow_name: string } & QualityBucket)[];
+}
+
 /** GET /usage — AI spend/usage aggregates. */
 export interface UsageSummary {
   days: number;

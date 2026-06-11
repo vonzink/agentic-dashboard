@@ -270,6 +270,27 @@ export class MemoryStore implements Store {
       [...this.approvalsById.values()]
         .filter((a) => a.task_id === taskId)
         .sort((a, b) => b.reviewed_at.localeCompare(a.reviewed_at)),
+    listDecisionsSince: async (sinceIso: string, companyId?: string) =>
+      [...this.approvalsById.values()]
+        .filter(
+          (a) =>
+            a.reviewed_at >= sinceIso &&
+            (!companyId || this.tasksById.get(a.task_id)?.company_id === companyId),
+        )
+        .flatMap((a) => {
+          const output = this.outputsById.get(a.output_id);
+          if (!output) return [];
+          const run = this.runsById.get(output.task_run_id);
+          return [
+            {
+              decision: a.decision,
+              reviewed_at: a.reviewed_at,
+              edited_final_content: a.edited_final_content,
+              output_content: output.content,
+              workflow_name: run?.workflow_name ?? '',
+            },
+          ];
+        }),
   };
 
   audit = {

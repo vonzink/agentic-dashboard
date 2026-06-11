@@ -95,6 +95,11 @@ const ROUTES: [RegExp, () => unknown][] = [
   [/^\/runs\//, () => ({ ...run, outputs: [output] })],
   [/^\/outputs\/[^/]+/, () => output],
   [/^\/outputs/, () => ({ items: [output], page: 1, pageSize: 20, total: 1 })],
+  [/^\/quality/, () => ({
+    days: 30, since: now,
+    totals: { decisions: 1, approved: 1, rejected: 0, changes_requested: 0, approved_with_edits: 1, avg_edit_ratio: 0.12 },
+    by_workflow: [{ workflow_name: 'condition_response_draft', decisions: 1, approved: 1, rejected: 0, changes_requested: 0, approved_with_edits: 1, avg_edit_ratio: 0.12 }],
+  })],
   [/^\/documents/, () => ({ items: [], page: 1, pageSize: 20, total: 0 })],
   [/^\/prompts/, () => ({ items: [] })],
   [/^\/audit/, () => ({ items: [], page: 1, pageSize: 25, total: 0 })],

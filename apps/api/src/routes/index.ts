@@ -254,6 +254,13 @@ export function buildRouter(s: Services): Router {
     res.json({ days, ...(await s.store.runs.usageSummary(since, company_id)) });
   });
 
+  // Reviewer-edit analytics: approval rates + how heavily reviewers edit
+  // AI drafts, per workflow. The built-in quality score for each agent.
+  r.get('/quality', requireRole('viewer'), async (req, res) => {
+    const { days, company_id } = usageQuery.parse(req.query);
+    res.json(await s.quality.summary(days, company_id));
+  });
+
   // ----- prompts (admin) ----------------------------------------------------------
   r.get('/prompts', requireRole('viewer'), async (req, res) => {
     res.json({ items: await s.prompts.list(listPromptsQuery.parse(req.query)) });

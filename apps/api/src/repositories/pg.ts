@@ -406,6 +406,31 @@ export class PgStore implements Store {
       );
       return rows.map(mapApproval);
     },
+    listDecisionsSince: async (sinceIso: string, companyId?: string) => {
+      const params: unknown[] = [sinceIso];
+      let companySql = '';
+      if (companyId) {
+        params.push(companyId);
+        companySql = ' AND t.company_id = $2';
+      }
+      const { rows } = await this.db.query(
+        `SELECT a.decision, a.reviewed_at, a.edited_final_content,
+                o.content AS output_content, r.workflow_name
+           FROM ai_approvals a
+           JOIN ai_outputs o ON o.id = a.output_id
+           JOIN ai_task_runs r ON r.id = o.task_run_id
+           JOIN ai_tasks t ON t.id = a.task_id
+          WHERE a.reviewed_at >= $1${companySql}`,
+        params,
+      );
+      return rows.map((row) => ({
+        decision: row.decision,
+        reviewed_at: iso(row.reviewed_at)!,
+        edited_final_content: row.edited_final_content,
+        output_content: row.output_content,
+        workflow_name: row.workflow_name,
+      }));
+    },
   };
 
   audit = {
