@@ -20,6 +20,8 @@ export interface Company {
   name: string;
   slug: string;
   is_active: boolean;
+  /** Monthly AI spend budget in USD (numeric string); null = no budget. */
+  monthly_budget: string | null;
   created_at: string;
 }
 

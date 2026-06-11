@@ -61,7 +61,11 @@ const run = {
 
 const ROUTES: [RegExp, () => unknown][] = [
   [/^\/health/, () => ({ status: 'ok', db: 'skipped', provider: { name: 'mock', configured: true }, version: 'mock' })],
-  [/^\/companies/, () => ({ items: [{ id: id(9), name: 'Mock Client Co', slug: 'mock', is_active: true, created_at: now }] })],
+  [/^\/companies/, () => ({ items: [{ id: id(9), name: 'Mock Client Co', slug: 'mock', is_active: true, monthly_budget: null, created_at: now }] })],
+  [/^\/budget/, () => ({
+    company_id: id(9), company_name: 'Mock Client Co', month: now.slice(0, 7),
+    monthly_budget: null, month_to_date: '0.000000', ratio: null,
+  })],
   // Must precede /^\/workflows/ — that pattern also matches this path.
   [/^\/workflows\/graph/, () => ({
     items: [{

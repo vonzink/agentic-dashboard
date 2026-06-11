@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
 import type {
   AiOutput,
+  BudgetStatus,
   Company,
   ApprovalResponse,
   AuditEvent,
@@ -87,9 +88,27 @@ export function useCreateCompany() {
 export function useUpdateCompany() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...body }: { id: string; name?: string; is_active?: boolean }) =>
-      apiFetch<Company>(`/companies/${id}`, { method: 'PATCH', body }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['companies'] }),
+    mutationFn: ({
+      id,
+      ...body
+    }: {
+      id: string;
+      name?: string;
+      is_active?: boolean;
+      monthly_budget?: number | null;
+    }) => apiFetch<Company>(`/companies/${id}`, { method: 'PATCH', body }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['companies'] });
+      qc.invalidateQueries({ queryKey: ['budget'] });
+    },
+  });
+}
+
+export function useBudget(companyId?: string) {
+  return useQuery({
+    queryKey: ['budget', companyId],
+    queryFn: () => apiFetch<BudgetStatus>('/budget', { query: { company_id: companyId } }),
+    staleTime: 60_000,
   });
 }
 

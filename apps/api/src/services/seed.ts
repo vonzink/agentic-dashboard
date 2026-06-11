@@ -15,6 +15,7 @@ export async function seedDefaults(store: Store): Promise<void> {
       name: 'Mountain State Financial Group',
       slug: 'msfg',
       is_active: true,
+      monthly_budget: null,
     });
   }
   for (const def of Object.values(WORKFLOWS)) {

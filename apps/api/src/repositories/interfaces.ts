@@ -121,7 +121,10 @@ export interface Store {
     get(id: string): Promise<Company | null>;
     getBySlug(slug: string): Promise<Company | null>;
     list(): Promise<Company[]>;
-    update(id: string, patch: Partial<Pick<Company, 'name' | 'is_active'>>): Promise<Company | null>;
+    update(
+      id: string,
+      patch: Partial<Pick<Company, 'name' | 'is_active' | 'monthly_budget'>>,
+    ): Promise<Company | null>;
   };
   tasks: {
     create(t: NewTask): Promise<Task>;

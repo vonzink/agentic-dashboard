@@ -27,6 +27,7 @@ export class CompanyService {
       name: body.name,
       slug: body.slug,
       is_active: true,
+      monthly_budget: null,
     });
     await this.audit.record('company.created', {
       actor: actor.email,
@@ -39,9 +40,15 @@ export class CompanyService {
   async update(
     actor: AuthUser,
     id: string,
-    patch: { name?: string; is_active?: boolean },
+    patch: { name?: string; is_active?: boolean; monthly_budget?: number | null },
   ): Promise<Company> {
-    const updated = await this.store.companies.update(id, patch);
+    const { monthly_budget, ...rest } = patch;
+    const updated = await this.store.companies.update(id, {
+      ...rest,
+      ...(monthly_budget !== undefined && {
+        monthly_budget: monthly_budget === null ? null : monthly_budget.toFixed(2),
+      }),
+    });
     if (!updated) throw ApiError.notFound('Company');
     await this.audit.record('company.updated', {
       actor: actor.email,
@@ -49,6 +56,35 @@ export class CompanyService {
       payload: { patch },
     });
     return updated;
+  }
+
+  /**
+   * Month-to-date AI spend vs the company's monthly budget. Budgets are a
+   * soft limit: the UI warns, runs are never blocked (a hard stop could
+   * freeze compliance work mid-month).
+   */
+  async budgetStatus(companyId?: string | null): Promise<{
+    company_id: string;
+    company_name: string;
+    month: string;
+    monthly_budget: string | null;
+    month_to_date: string;
+    ratio: number | null;
+  }> {
+    const company = await this.resolve(companyId);
+    const now = new Date();
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+    const usage = await this.store.runs.usageSummary(monthStart, company.id);
+    const spend = Number(usage.totals.estimated_cost);
+    const budget = company.monthly_budget === null ? null : Number(company.monthly_budget);
+    return {
+      company_id: company.id,
+      company_name: company.name,
+      month: monthStart.slice(0, 7),
+      monthly_budget: company.monthly_budget,
+      month_to_date: spend.toFixed(6),
+      ratio: budget && budget > 0 ? Number((spend / budget).toFixed(4)) : null,
+    };
   }
 
   /**

@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuditLog, useHealth, useQuality, useReviewQueue, useTasks, useUsage, useWorkflows } from '../api/hooks';
+import { useAuditLog, useBudget, useHealth, useQuality, useReviewQueue, useTasks, useUsage, useWorkflows } from '../api/hooks';
 import { ErrorState, Loading } from '../components/States';
 import { activeCompanyId } from '../lib/company';
 import { fmtCost, fmtDate, titleCase } from '../lib/format';
@@ -13,6 +13,7 @@ export function DashboardPage() {
   const workflows = useWorkflows();
   const usage = useUsage(30, activeCompanyId() ?? undefined);
   const quality = useQuality(30, activeCompanyId() ?? undefined);
+  const budget = useBudget(activeCompanyId() ?? undefined);
 
   if (openTasks.isError) {
     return <ErrorState error={openTasks.error} onRetry={() => openTasks.refetch()} />;
@@ -20,8 +21,19 @@ export function DashboardPage() {
 
   const implemented = workflows.data?.items.filter((w) => w.implemented && w.is_active) ?? [];
 
+  const b = budget.data;
+  const overBudget = b?.ratio !== null && b !== undefined && b.ratio >= 1;
+  const nearBudget = b?.ratio !== null && b !== undefined && b.ratio >= 0.8 && b.ratio < 1;
+
   return (
     <div>
+      {(overBudget || nearBudget) && b && (
+        <div className={`banner ${overBudget ? 'error' : 'warn'}`}>
+          {b.company_name} has used {Math.round((b.ratio ?? 0) * 100)}% of its ${b.monthly_budget}{' '}
+          monthly AI budget ({fmtCost(b.month_to_date)} so far in {b.month}).
+          {overBudget && ' Budget exceeded — runs still work, but review usage in Admin.'}
+        </div>
+      )}
       <div className="stat-grid">
         <div className="stat">
           <div className="num">{openTasks.data?.total ?? '…'}</div>

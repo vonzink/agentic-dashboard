@@ -5,6 +5,7 @@ import { currentUser, requireRole } from '../middleware/auth';
 import { ApiError } from '../middleware/error';
 import {
   approveBody,
+  budgetQuery,
   createActionBody,
   createChunkBody,
   createCompanyBody,
@@ -252,6 +253,12 @@ export function buildRouter(s: Services): Router {
     const { days, company_id } = usageQuery.parse(req.query);
     const since = new Date(Date.now() - days * 86_400_000).toISOString();
     res.json({ days, ...(await s.store.runs.usageSummary(since, company_id)) });
+  });
+
+  // Month-to-date spend vs the company's monthly budget (soft limit).
+  r.get('/budget', requireRole('viewer'), async (req, res) => {
+    const { company_id } = budgetQuery.parse(req.query);
+    res.json(await s.companies.budgetStatus(company_id));
   });
 
   // Reviewer-edit analytics: approval rates + how heavily reviewers edit

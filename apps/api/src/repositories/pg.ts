@@ -131,8 +131,8 @@ export class PgStore implements Store {
   companies = {
     create: async (c: NewCompany): Promise<Company> => {
       const { rows } = await this.db.query(
-        'INSERT INTO ai_companies (name, slug, is_active) VALUES ($1,$2,$3) RETURNING *',
-        [c.name, c.slug, c.is_active],
+        'INSERT INTO ai_companies (name, slug, is_active, monthly_budget) VALUES ($1,$2,$3,$4) RETURNING *',
+        [c.name, c.slug, c.is_active, c.monthly_budget],
       );
       return mapCompany(rows[0]);
     },

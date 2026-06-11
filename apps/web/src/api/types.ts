@@ -23,7 +23,19 @@ export interface Company {
   name: string;
   slug: string;
   is_active: boolean;
+  /** Monthly AI spend budget in USD (numeric string); null = no budget. */
+  monthly_budget: string | null;
   created_at: string;
+}
+
+/** GET /budget — month-to-date spend vs the company's soft budget. */
+export interface BudgetStatus {
+  company_id: string;
+  company_name: string;
+  month: string;
+  monthly_budget: string | null;
+  month_to_date: string;
+  ratio: number | null;
 }
 
 export type TaskType =

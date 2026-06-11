@@ -98,9 +98,15 @@ export const createCompanyBody = z.object({
 });
 
 export const updateCompanyBody = z
-  .object({ name: z.string().min(1).max(200), is_active: z.boolean() })
+  .object({
+    name: z.string().min(1).max(200),
+    is_active: z.boolean(),
+    monthly_budget: z.number().nonnegative().max(1_000_000).nullable(),
+  })
   .partial()
   .refine((b) => Object.keys(b).length > 0, { message: 'empty patch' });
+
+export const budgetQuery = z.object({ company_id: z.uuid().optional() });
 
 export const approveBody = z.object({
   reviewer_notes: z.string().max(5_000).nullish(),

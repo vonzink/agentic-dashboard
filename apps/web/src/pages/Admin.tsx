@@ -129,13 +129,29 @@ function CompaniesTab() {
         {companies.isPending && <Loading />}
         {companies.data && (
           <table className="data">
-            <thead><tr><th>Name</th><th>Slug</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>Name</th><th>Slug</th><th>Status</th><th>Monthly AI budget</th><th></th></tr></thead>
             <tbody>
               {companies.data.items.map((c) => (
                 <tr key={c.id}>
                   <td><strong>{c.name}</strong></td>
                   <td className="mono">{c.slug}</td>
                   <td>{c.is_active ? <span className="badge green">active</span> : <span className="badge neutral">inactive</span>}</td>
+                  <td>
+                    {c.monthly_budget === null ? <span className="muted">none</span> : `$${c.monthly_budget}`}{' '}
+                    <button className="btn sm ghost" disabled={update.isPending}
+                      onClick={() => {
+                        const raw = window.prompt(
+                          `Monthly AI budget for ${c.name} (USD, blank to remove):`,
+                          c.monthly_budget ?? '',
+                        );
+                        if (raw === null) return;
+                        const value = raw.trim() === '' ? null : Number(raw);
+                        if (value !== null && (!Number.isFinite(value) || value < 0)) return;
+                        update.mutate({ id: c.id, monthly_budget: value });
+                      }}>
+                      Set
+                    </button>
+                  </td>
                   <td>
                     <button className="btn sm ghost" disabled={update.isPending}
                       onClick={() => update.mutate({ id: c.id, is_active: !c.is_active })}>
