@@ -318,6 +318,15 @@ export function buildRouter(s: Services): Router {
     res.json(await s.projects.sync(currentUser(req), param(req, 'id')));
   });
 
+  // AI architecture map: drafts via the standard task/run/review pipeline.
+  r.post('/projects/:id/map', requireRole('operator'), async (req, res) => {
+    res.status(201).json(await s.projects.generateMap(currentUser(req), param(req, 'id')));
+  });
+
+  r.get('/projects/:id/map', requireRole('viewer'), async (req, res) => {
+    res.json({ output: await s.projects.latestMap(param(req, 'id')) });
+  });
+
   // ----- eval sets -----------------------------------------------------------------
   // Saved test inputs per workflow, run against a prompt version before
   // activating it. Sandboxed: no tasks/outputs/review-queue side effects.

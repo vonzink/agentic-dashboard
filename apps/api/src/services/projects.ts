@@ -1,11 +1,15 @@
 import { ApiError } from '../middleware/error';
 import type { Store } from '../repositories/interfaces';
-import type { AuthUser, Project, ProjectStatus } from '../types/domain';
+import type { AiOutput, AuthUser, Project, ProjectStatus } from '../types/domain';
 import type { AuditService } from './audit';
 import type { CompanyService } from './companies';
 import type { DocumentService } from './documents';
 import { assertRepoFormat, type GitHubClient } from './github';
 import { manifestPathsToFetch, scanRepo, type RepoStructure } from './repoScan';
+import type { RunService } from './runs';
+import type { TaskService } from './tasks';
+
+const MAP_WORKFLOW = 'project_architecture_map';
 
 /**
  * Projects registry: the codebases/products ZVZ runs, each optionally
@@ -20,6 +24,8 @@ export class ProjectService {
     private audit: AuditService,
     private companies: CompanyService,
     private documents: DocumentService,
+    private tasks: TaskService,
+    private runs: RunService,
     private github: GitHubClient,
   ) {}
 
@@ -177,6 +183,92 @@ export class ProjectService {
     });
     return updated;
   }
+
+  /**
+   * Layer 2: drafts the AI architecture map for a project. Creates a
+   * regular task (so the run, draft, review, and audit trail all flow
+   * through the standard pipeline) with the deterministic repo scan and
+   * README as grounding sources. The draft lands in the Approval Center;
+   * only an approved map is displayed.
+   */
+  async generateMap(actor: AuthUser, id: string) {
+    const project = await this.get(id);
+    if (!project.structure_json && !project.readme_document_id) {
+      throw ApiError.conflict(
+        'NEEDS_SYNC',
+        `Project '${project.name}' has no repo scan or README yet — run Sync from GitHub first`,
+      );
+    }
+
+    const task = await this.tasks.create(actor, {
+      title: `Architecture map — ${project.name}`,
+      task_type: 'general',
+      priority: 'normal',
+      company_id: project.company_id,
+      project_id: project.id,
+      metadata_json: { purpose: 'architecture_map', project_id: project.id },
+    });
+    await this.tasks.addInput(actor, task.id, {
+      input_type: 'instruction',
+      content:
+        `Map the architecture of the project "${project.name}"` +
+        (project.github_repo ? ` (repo ${project.github_repo})` : '') +
+        '. Ground every component in the provided repo scan and README.',
+    });
+    if (project.structure_json) {
+      await this.tasks.addInput(actor, task.id, {
+        input_type: 'source_snippet',
+        content: renderStructure(project.structure_json),
+      });
+    }
+    if (project.readme_document_id) {
+      const doc = await this.store.documents.get(project.readme_document_id);
+      if (doc) {
+        await this.tasks.addInput(actor, task.id, {
+          input_type: 'document_reference',
+          content: doc.filename,
+          source_document_id: doc.id,
+        });
+      }
+    }
+
+    const result = await this.runs.run(actor, task.id, MAP_WORKFLOW);
+    return { task, ...result };
+  }
+
+  /** Most recent architecture-map output for a project (any review state). */
+  async latestMap(projectId: string): Promise<AiOutput | null> {
+    await this.get(projectId);
+    const tasks = await this.store.tasks.list({ project_id: projectId, page: 1, pageSize: 100 });
+    for (const task of tasks.items) {
+      const runs = await this.store.runs.listByTask(task.id);
+      for (const run of runs) {
+        if (run.workflow_name !== MAP_WORKFLOW || run.status !== 'succeeded') continue;
+        const outputs = await this.store.outputs.listByRun(run.id);
+        if (outputs.length) return outputs[0]!;
+      }
+    }
+    return null;
+  }
+}
+
+/** Renders the deterministic scan as a prompt-friendly fact sheet. */
+function renderStructure(s: RepoStructure): string {
+  const lines = [
+    'DETERMINISTIC REPO SCAN (parsed from the repository tree — ground truth):',
+    `Default branch: ${s.default_branch} · ${s.total_files} files${s.tree_truncated ? ' (tree truncated)' : ''}`,
+    `Detected stack: ${s.stack.join(', ') || '(none detected)'}`,
+    `Languages (bytes): ${Object.entries(s.languages)
+      .sort((a, b) => b[1] - a[1])
+      .map(([l, b]) => `${l}=${b}`)
+      .join(', ') || '(unknown)'}`,
+    'Directories:',
+    ...s.directories.map(
+      (d) =>
+        `- ${d.path}/ — role: ${d.role}, ${d.file_count} files${d.signals.length ? ` (signals: ${d.signals.join(', ')})` : ''}`,
+    ),
+  ];
+  return lines.join('\n');
 }
 
 function assertGitHubRepo(ownerRepo: string): void {

@@ -415,6 +415,26 @@ export interface RepoStructure {
   scanned_at: string;
 }
 
+/** project_architecture_map structured output (Layer 2). */
+export type ArchComponentKind =
+  | 'frontend' | 'api' | 'backend' | 'database' | 'infra' | 'external_service' | 'other';
+
+export interface ArchComponent {
+  name: string;
+  kind: ArchComponentKind;
+  tech: string;
+  purpose: string;
+  talks_to: string[];
+}
+
+export interface ArchitectureMap {
+  summary?: string;
+  components?: ArchComponent[];
+  open_questions?: string[];
+  warnings?: string[];
+  confidence_label?: ConfidenceLabel;
+}
+
 export interface Project {
   id: string;
   company_id: string;

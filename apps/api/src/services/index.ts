@@ -64,7 +64,8 @@ export function buildServices(
   const quality = new QualityService(store);
   const evals = new EvalService(store, audit, prompts, providerRegistry);
   const projects = new ProjectService(
-    store, audit, companies, documents, github ?? createGitHubClient(config.githubToken),
+    store, audit, companies, documents, tasks, runs,
+    github ?? createGitHubClient(config.githubToken),
   );
   return {
     audit, companies, tasks, documents, prompts, runs, approvals, actions, quality, notifications,

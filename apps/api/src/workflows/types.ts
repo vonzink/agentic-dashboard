@@ -96,6 +96,36 @@ export const websiteQaSchema = z.object({
   ...common,
 });
 
+/** project_architecture_map — components + relationships, drawn as a diagram
+ * once a human approves it. */
+export const COMPONENT_KINDS = [
+  'frontend',
+  'api',
+  'backend',
+  'database',
+  'infra',
+  'external_service',
+  'other',
+] as const;
+
+export const projectArchitectureSchema = z.object({
+  summary: z.string(),
+  components: z
+    .array(
+      z.object({
+        name: z.string(),
+        kind: z.enum(COMPONENT_KINDS),
+        tech: z.string().default(''),
+        purpose: z.string(),
+        /** Names of other components this one communicates with. */
+        talks_to: z.array(z.string()).default([]),
+      }),
+    )
+    .default([]),
+  open_questions: z.array(z.string()).default([]),
+  ...common,
+});
+
 /** Shared shape for the file-review agents (income/asset/credit/title). */
 export const fileReviewSchema = z.object({
   summary: z.string(),

@@ -104,6 +104,7 @@ const ROUTES: [RegExp, () => unknown][] = [
     totals: { decisions: 1, approved: 1, rejected: 0, changes_requested: 0, approved_with_edits: 1, avg_edit_ratio: 0.12 },
     by_workflow: [{ workflow_name: 'condition_response_draft', decisions: 1, approved: 1, rejected: 0, changes_requested: 0, approved_with_edits: 1, avg_edit_ratio: 0.12 }],
   })],
+  [/^\/projects\/[^/]+\/map/, () => ({ output: null })],
   [/^\/projects/, () => ({ items: [] })],
   [/^\/documents/, () => ({ items: [], page: 1, pageSize: 20, total: 0 })],
   [/^\/prompts/, () => ({ items: [] })],

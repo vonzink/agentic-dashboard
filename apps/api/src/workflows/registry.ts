@@ -5,6 +5,7 @@ import {
   conditionResponseSchema,
   documentChecklistSchema,
   fileReviewSchema,
+  projectArchitectureSchema,
   renderSources,
   sopLookupSchema,
   websiteQaSchema,
@@ -343,6 +344,76 @@ export const websiteQa: WorkflowDefinition = {
   },
 };
 
+export const projectArchitectureMap: WorkflowDefinition = {
+  name: 'project_architecture_map',
+  taskType: 'general',
+  description:
+    'Drafts an architecture map (components + relationships) for a registered project from its deterministic repo scan and README — displayed only after human approval',
+  outputType: 'other',
+  outputSchema: projectArchitectureSchema,
+  guardrails: [
+    'The map is drafted only from the deterministic repo scan and README provided as sources — components must be evidenced there',
+    'Drafts produced without a repo scan or README are flagged and capped at LOW confidence',
+    'talks_to references to components not present in the map are flagged for the reviewer',
+    'Only a human-approved map is displayed on the project page',
+  ],
+  buildUserContext: (input) => renderSources(input.sources),
+  mainContent: (s) => {
+    const lines = [str(s.summary), ''];
+    const components = Array.isArray(s.components) ? s.components : [];
+    for (const c of components) {
+      const comp = c as Record<string, unknown>;
+      const talks = Array.isArray(comp.talks_to) && comp.talks_to.length
+        ? ` → talks to: ${(comp.talks_to as string[]).join(', ')}`
+        : '';
+      lines.push(`[${str(comp.kind)}] ${str(comp.name)} (${str(comp.tech)}): ${str(comp.purpose)}${talks}`);
+    }
+    return lines.join('\n');
+  },
+  mockOutput: (input) => ({
+    summary: `Architecture map for ${input.task_title} (mock): a web frontend backed by an API and a database.`,
+    components: [
+      { name: 'Web UI', kind: 'frontend', tech: 'React + Vite', purpose: 'User-facing interface (mock)', talks_to: ['API server'] },
+      { name: 'API server', kind: 'backend', tech: 'Express', purpose: 'Business logic and data access (mock)', talks_to: ['Database'] },
+      { name: 'Database', kind: 'database', tech: 'Postgres', purpose: 'Persistent storage (mock)', talks_to: [] },
+    ],
+    open_questions: ['Confirm how deployments are triggered (mock)'],
+    citations: mockCitations(input),
+    confidence_label: input.sources.length ? 'MEDIUM' : 'LOW',
+    requires_human_review: true,
+    warnings: [],
+  }),
+  assess: (s, input) => {
+    const warnings: string[] = [];
+    let confidence = conf(s.confidence_label);
+    const components = Array.isArray(s.components)
+      ? (s.components as { name?: unknown; talks_to?: unknown }[])
+      : [];
+    if (!input.sources.length) {
+      warnings.push(
+        'No repo scan or README was provided — this map is a guess and must not be approved without verification.',
+      );
+      confidence = 'LOW';
+    }
+    if (!components.length) {
+      warnings.push('The map contains no components.');
+      confidence = capConfidence(confidence, 'LOW');
+    }
+    const names = new Set(components.map((c) => String(c.name ?? '')));
+    const dangling = components.flatMap((c) =>
+      (Array.isArray(c.talks_to) ? (c.talks_to as string[]) : []).filter((t) => !names.has(t)),
+    );
+    if (dangling.length) {
+      warnings.push(
+        `talks_to references components not in the map: ${[...new Set(dangling)].join(', ')} — verify before approving.`,
+      );
+      confidence = capConfidence(confidence, 'MEDIUM');
+    }
+    warnings.push('Architecture maps are displayed only after human approval.');
+    return { warnings, confidence };
+  },
+};
+
 /** Implemented workflows, by name. */
 export const WORKFLOWS: Record<string, WorkflowDefinition> = Object.fromEntries(
   [
@@ -355,6 +426,7 @@ export const WORKFLOWS: Record<string, WorkflowDefinition> = Object.fromEntries(
     creditReview,
     titleInsuranceReview,
     websiteQa,
+    projectArchitectureMap,
   ].map((w) => [w.name, w]),
 );
 

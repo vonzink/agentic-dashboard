@@ -2,11 +2,20 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   useCreateProject,
+  useGenerateMap,
+  useProjectMap,
   useProjects,
   useSyncProject,
   useUpdateProject,
 } from '../api/hooks';
-import type { Project, ProjectStatus, RepoStructure } from '../api/types';
+import type {
+  ArchComponent,
+  ArchComponentKind,
+  ArchitectureMap,
+  Project,
+  ProjectStatus,
+  RepoStructure,
+} from '../api/types';
 import { ErrorState, Loading } from '../components/States';
 import { activeCompanyId } from '../lib/company';
 import { currentIdentity } from '../lib/identity';
@@ -80,6 +89,106 @@ function StructureSection({ structure }: { structure: RepoStructure }) {
   );
 }
 
+const KIND_ORDER: ArchComponentKind[] = [
+  'frontend', 'api', 'backend', 'database', 'infra', 'external_service', 'other',
+];
+const KIND_LABEL: Record<ArchComponentKind, string> = {
+  frontend: 'Frontend',
+  api: 'API',
+  backend: 'Backend',
+  database: 'Data',
+  infra: 'Infra',
+  external_service: 'External',
+  other: 'Other',
+};
+
+function ArchDiagram({ map }: { map: ArchitectureMap }) {
+  const components = map.components ?? [];
+  const columns = KIND_ORDER.map((kind) => ({
+    kind,
+    items: components.filter((c) => c.kind === kind),
+  })).filter((col) => col.items.length > 0);
+
+  return (
+    <div>
+      {map.summary && <p className="muted" style={{ marginTop: 8 }}>{map.summary}</p>}
+      <div className="arch-grid">
+        {columns.map((col) => (
+          <div key={col.kind} className="arch-col">
+            <div className="arch-col-title">{KIND_LABEL[col.kind]}</div>
+            {col.items.map((c: ArchComponent) => (
+              <div key={c.name} className={`flow-node ${col.kind === 'frontend' ? 'ai' : col.kind === 'database' ? 'gate' : col.kind === 'infra' ? 'check' : 'human'}`}>
+                <div className="k">{c.tech || KIND_LABEL[c.kind]}</div>
+                <div className="t">{c.name}</div>
+                <div className="d">{c.purpose}</div>
+                {c.talks_to.length > 0 && (
+                  <div className="d" style={{ marginTop: 4 }}>
+                    → {c.talks_to.join(' · ')}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+      {(map.open_questions?.length ?? 0) > 0 && (
+        <p className="muted" style={{ fontSize: 12 }}>
+          Open questions: {map.open_questions!.join(' · ')}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ArchitectureSection({ project }: { project: Project }) {
+  const mapQuery = useProjectMap(project.id);
+  const generate = useGenerateMap();
+  const output = mapQuery.data?.output ?? null;
+  const canMap = Boolean(project.structure_json || project.readme_document_id);
+  const approved = output && ['APPROVED', 'FINALIZED'].includes(output.review_status);
+
+  return (
+    <div style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <strong style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--msfg-teal)' }}>
+          Architecture map
+        </strong>
+        {output && (
+          <span className={`badge ${approved ? 'green' : output.review_status === 'NEEDS_REVIEW' ? 'amber' : 'neutral'}`}>
+            {output.review_status.replace(/_/g, ' ').toLowerCase()}
+          </span>
+        )}
+        <span className="grow" />
+        <button
+          className="btn sm"
+          disabled={generate.isPending || !canMap}
+          title={canMap ? 'AI drafts the map; it must be approved before display' : 'Sync from GitHub first'}
+          onClick={() => generate.mutate(project.id)}
+        >
+          {generate.isPending ? 'Drafting…' : output ? 'Redraft map (AI)' : 'Draft map (AI)'}
+        </button>
+      </div>
+      {generate.isError && <ErrorState error={generate.error} />}
+
+      {!output && (
+        <p className="muted" style={{ fontSize: 12, margin: '6px 0 0' }}>
+          {canMap
+            ? 'No map yet. The AI drafts one from the repo scan + README; you approve it before it appears here.'
+            : 'Sync from GitHub first so the map has ground truth to draw from.'}
+        </p>
+      )}
+      {output && !approved && (
+        <p className="muted" style={{ fontSize: 12, margin: '6px 0 0' }}>
+          A draft map is awaiting review — verify it in the{' '}
+          <Link to={`/approvals?output=${output.id}`}>Approval Center</Link>. Only approved maps
+          are displayed.
+        </p>
+      )}
+      {output && approved && <ArchDiagram map={(output.structured_json ?? {}) as ArchitectureMap} />}
+    </div>
+  );
+}
+
 function ProjectCard({ project, isAdmin }: { project: Project; isAdmin: boolean }) {
   const sync = useSyncProject();
   const update = useUpdateProject();
@@ -142,6 +251,8 @@ function ProjectCard({ project, isAdmin }: { project: Project; isAdmin: boolean 
       </p>
 
       {project.structure_json && <StructureSection structure={project.structure_json} />}
+
+      <ArchitectureSection project={project} />
 
       <p style={{ margin: '8px 0 0', fontSize: 12 }}>
         <Link to={`/tasks?project=${project.id}`}>AI tasks for this project →</Link>

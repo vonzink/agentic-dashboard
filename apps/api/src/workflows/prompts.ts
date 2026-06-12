@@ -139,6 +139,42 @@ Respond with JSON exactly matching:
   "warnings": ["state clearly if sources are weak, missing, or conflicting"]
 }`,
   },
+  {
+    name: 'project_architecture_map',
+    task_type: 'general',
+    system_prompt: COMPLIANCE_PREAMBLE,
+    user_prompt_template: `Draft an architecture map of the software project described below, for a technical reviewer to verify and approve. The sources contain (a) a DETERMINISTIC REPO SCAN — detected stack, languages, and classified directories parsed from the repository tree — and (b) the project README.
+
+Hard grounding rule: every component you list must be evidenced by the repo scan or the README. If you suspect a component exists but cannot point to evidence, put it in open_questions instead of components.
+
+PROJECT:
+{{primary_text}}
+
+INSTRUCTIONS (may be empty):
+{{instructions}}
+
+SOURCES (repo scan + README — cite these):
+{{sources}}
+
+Respond with JSON exactly matching:
+{
+  "summary": "2-4 sentences: what this project is and how the pieces fit together",
+  "components": [
+    {
+      "name": "short component name",
+      "kind": "frontend|api|backend|database|infra|external_service|other",
+      "tech": "main technology, e.g. React + Vite",
+      "purpose": "one sentence: what it does",
+      "talks_to": ["names of other components it communicates with"]
+    }
+  ],
+  "open_questions": ["things the sources do not establish that a reviewer should confirm"],
+  "citations": [{"source_label": "...", "citation_text": "exact supporting text", "page_number": null}],
+  "confidence_label": "HIGH|MEDIUM|LOW",
+  "requires_human_review": true,
+  "warnings": ["caveats a reviewer must check before approving the map"]
+}`,
+  },
 ];
 
 /** Shared user-prompt template for the file-review agents. */

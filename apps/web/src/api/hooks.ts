@@ -405,6 +405,26 @@ export function useSyncProject() {
   });
 }
 
+export function useProjectMap(projectId: string) {
+  return useQuery({
+    queryKey: ['projects', projectId, 'map'],
+    queryFn: () => apiFetch<{ output: AiOutput | null }>(`/projects/${projectId}/map`),
+  });
+}
+
+export function useGenerateMap() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (projectId: string) =>
+      apiFetch<RunResponse>(`/projects/${projectId}/map`, { method: 'POST' }),
+    onSuccess: (_data, projectId) => {
+      qc.invalidateQueries({ queryKey: ['projects', projectId, 'map'] });
+      qc.invalidateQueries({ queryKey: ['tasks'] });
+      qc.invalidateQueries({ queryKey: ['outputs'] });
+    },
+  });
+}
+
 // ---------- eval sets ----------
 
 export function useEvalCases(workflowName?: string) {
