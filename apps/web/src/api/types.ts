@@ -397,6 +397,24 @@ export interface GitHubRepoMeta {
   html_url: string;
 }
 
+export interface RepoDirectory {
+  path: string;
+  role: 'frontend' | 'backend' | 'database' | 'infra' | 'docs' | 'tests' | 'other';
+  file_count: number;
+  signals: string[];
+}
+
+/** Deterministic repo scan — parsed facts, not AI output. */
+export interface RepoStructure {
+  default_branch: string;
+  total_files: number;
+  tree_truncated: boolean;
+  languages: Record<string, number>;
+  stack: string[];
+  directories: RepoDirectory[];
+  scanned_at: string;
+}
+
 export interface Project {
   id: string;
   company_id: string;
@@ -407,6 +425,7 @@ export interface Project {
   status: ProjectStatus;
   notes: string | null;
   github_meta_json: GitHubRepoMeta | null;
+  structure_json: RepoStructure | null;
   github_synced_at: string | null;
   github_readme_sha: string | null;
   readme_document_id: string | null;

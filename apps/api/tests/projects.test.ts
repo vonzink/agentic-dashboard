@@ -32,6 +32,36 @@ class FakeGitHub implements GitHubClient {
   async getReadme(): Promise<{ content: string; sha: string } | null> {
     return this.readme;
   }
+  tree = {
+    entries: [
+      { path: 'web', type: 'tree' as const },
+      { path: 'web/package.json', type: 'blob' as const },
+      { path: 'web/src/App.tsx', type: 'blob' as const },
+      { path: 'web/src/styles.css', type: 'blob' as const },
+      { path: 'server', type: 'tree' as const },
+      { path: 'server/package.json', type: 'blob' as const },
+      { path: 'server/index.ts', type: 'blob' as const },
+      { path: 'migrations/0001_init.sql', type: 'blob' as const },
+      { path: 'Dockerfile', type: 'blob' as const },
+      { path: 'README.md', type: 'blob' as const },
+    ],
+    truncated: false,
+  };
+  async getTree() {
+    return this.tree;
+  }
+  async getLanguages(): Promise<Record<string, number>> {
+    return { TypeScript: 9000, CSS: 800 };
+  }
+  async getFile(_repo: string, path: string): Promise<string | null> {
+    if (path === 'web/package.json') {
+      return JSON.stringify({ dependencies: { react: '^18', vite: '^5' } });
+    }
+    if (path === 'server/package.json') {
+      return JSON.stringify({ dependencies: { express: '^4', pg: '^8' } });
+    }
+    return null;
+  }
 }
 
 async function buildProjectApp() {
@@ -102,6 +132,28 @@ describe('projects registry', () => {
     expect(chunks[0]!.content).toContain('msfg-calc');
   });
 
+  it('sync stores the deterministic structure scan', async () => {
+    const { app } = await buildProjectApp();
+    const { body: project } = await createProject(app);
+    const synced = await request(app)
+      .post(`/api/ai/projects/${project.id}/sync`)
+      .set(as.operator)
+      .expect(200);
+
+    const structure = synced.body.structure_json;
+    expect(structure.total_files).toBe(8);
+    expect(structure.languages.TypeScript).toBe(9000);
+    expect(structure.stack).toEqual(
+      expect.arrayContaining(['React', 'Vite', 'Express', 'Postgres (pg)', 'Node.js', 'Docker', 'SQL migrations']),
+    );
+    const roles = Object.fromEntries(
+      structure.directories.map((d: { path: string; role: string }) => [d.path, d.role]),
+    );
+    expect(roles.web).toBe('frontend');
+    expect(roles.server).toBe('backend');
+    expect(roles.migrations).toBe('database');
+  });
+
   it('re-sync skips README import when the sha is unchanged, re-imports on change', async () => {
     const { app, github } = await buildProjectApp();
     const { body: project } = await createProject(app);
@@ -152,8 +204,8 @@ describe('projects registry', () => {
     const foreign = await store.projects.create({
       company_id: acme.id, name: 'acme-site', description: null, github_repo: null,
       live_url: null, status: 'active', notes: null, github_meta_json: null,
-      github_synced_at: null, github_readme_sha: null, readme_document_id: null,
-      created_by: 'admin@test.local',
+      structure_json: null, github_synced_at: null, github_readme_sha: null,
+      readme_document_id: null, created_by: 'admin@test.local',
     });
     await request(app)
       .post('/api/ai/tasks')
@@ -168,8 +220,8 @@ describe('projects registry', () => {
     const project = await store.projects.create({
       company_id: msfg.id, name: 'p', description: null, github_repo: 'vonzink/p',
       live_url: null, status: 'active', notes: null, github_meta_json: null,
-      github_synced_at: null, github_readme_sha: null, readme_document_id: null,
-      created_by: 'admin@test.local',
+      structure_json: null, github_synced_at: null, github_readme_sha: null,
+      readme_document_id: null, created_by: 'admin@test.local',
     });
     const res = await request(app).post(`/api/ai/projects/${project.id}/sync`).set(as.operator);
     expect(res.status).toBe(409);

@@ -6,7 +6,7 @@ import {
   useSyncProject,
   useUpdateProject,
 } from '../api/hooks';
-import type { Project, ProjectStatus } from '../api/types';
+import type { Project, ProjectStatus, RepoStructure } from '../api/types';
 import { ErrorState, Loading } from '../components/States';
 import { activeCompanyId } from '../lib/company';
 import { currentIdentity } from '../lib/identity';
@@ -17,6 +17,68 @@ const STATUS_BADGE: Record<ProjectStatus, string> = {
   paused: 'amber',
   archived: 'neutral',
 };
+
+const ROLE_BADGE: Record<RepoStructure['directories'][number]['role'], string> = {
+  frontend: 'green',
+  backend: 'teal',
+  database: 'dark',
+  infra: 'amber',
+  docs: 'neutral',
+  tests: 'neutral',
+  other: 'neutral',
+};
+
+function StructureSection({ structure }: { structure: RepoStructure }) {
+  const [open, setOpen] = useState(false);
+  const totalBytes = Object.values(structure.languages).reduce((a, b) => a + b, 0) || 1;
+  const languages = Object.entries(structure.languages)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6);
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+        {structure.stack.map((tech) => (
+          <span key={tech} className="badge teal">{tech}</span>
+        ))}
+        <button className="btn sm ghost" onClick={() => setOpen(!open)}>
+          {open ? 'hide structure' : `structure (${structure.total_files} files)`}
+        </button>
+      </div>
+      {open && (
+        <div style={{ marginTop: 10 }}>
+          <p className="muted" style={{ fontSize: 12, margin: '0 0 6px' }}>
+            Languages:{' '}
+            {languages.map(([lang, bytes]) => (
+              <span key={lang} style={{ marginRight: 10 }}>
+                <strong>{lang}</strong> {Math.round((bytes / totalBytes) * 100)}%
+              </span>
+            ))}
+            {structure.tree_truncated && ' · (large repo — tree truncated)'}
+          </p>
+          <table className="data">
+            <thead>
+              <tr><th>Directory</th><th>Role</th><th>Files</th><th>Why</th></tr>
+            </thead>
+            <tbody>
+              {structure.directories.map((d) => (
+                <tr key={d.path}>
+                  <td className="mono">{d.path}/</td>
+                  <td><span className={`badge ${ROLE_BADGE[d.role]}`}>{d.role}</span></td>
+                  <td>{d.file_count}</td>
+                  <td className="muted">{d.signals.join(', ') || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="muted" style={{ fontSize: 11, margin: '6px 0 0' }}>
+            Parsed from the repo tree and manifests on sync — facts, not AI output.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ProjectCard({ project, isAdmin }: { project: Project; isAdmin: boolean }) {
   const sync = useSyncProject();
@@ -78,6 +140,8 @@ function ProjectCard({ project, isAdmin }: { project: Project; isAdmin: boolean 
           <> · <Link to="/documents">README in library</Link></>
         )}
       </p>
+
+      {project.structure_json && <StructureSection structure={project.structure_json} />}
 
       <p style={{ margin: '8px 0 0', fontSize: 12 }}>
         <Link to={`/tasks?project=${project.id}`}>AI tasks for this project →</Link>

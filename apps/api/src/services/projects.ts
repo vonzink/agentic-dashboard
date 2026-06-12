@@ -5,6 +5,7 @@ import type { AuditService } from './audit';
 import type { CompanyService } from './companies';
 import type { DocumentService } from './documents';
 import { assertRepoFormat, type GitHubClient } from './github';
+import { manifestPathsToFetch, scanRepo, type RepoStructure } from './repoScan';
 
 /**
  * Projects registry: the codebases/products ZVZ runs, each optionally
@@ -54,6 +55,7 @@ export class ProjectService {
       status: 'active',
       notes: body.notes ?? null,
       github_meta_json: null,
+      structure_json: null,
       github_synced_at: null,
       github_readme_sha: null,
       readme_document_id: null,
@@ -133,8 +135,32 @@ export class ProjectService {
       readmeDocumentId = doc.id;
     }
 
+    // Layer-1 structure scan: parsed facts (tree + languages + manifests).
+    // Best-effort — a scan failure keeps the previous structure and never
+    // fails the sync.
+    let structure: RepoStructure | null = project.structure_json;
+    try {
+      const tree = await this.github.getTree(project.github_repo, meta.default_branch);
+      const languages = await this.github.getLanguages(project.github_repo);
+      const manifests: Record<string, string> = {};
+      for (const path of manifestPathsToFetch(tree.entries)) {
+        const content = await this.github.getFile(project.github_repo, path);
+        if (content) manifests[path] = content;
+      }
+      structure = scanRepo({
+        default_branch: meta.default_branch,
+        entries: tree.entries,
+        truncated: tree.truncated,
+        languages,
+        manifests,
+      });
+    } catch {
+      // keep previous structure
+    }
+
     const updated = (await this.store.projects.update(id, {
       github_meta_json: meta,
+      structure_json: structure,
       github_synced_at: new Date().toISOString(),
       github_readme_sha: readmeSha,
       readme_document_id: readmeDocumentId,

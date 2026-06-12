@@ -210,6 +210,8 @@ export interface Project {
   status: ProjectStatus;
   notes: string | null;
   github_meta_json: GitHubRepoMeta | null;
+  /** Deterministic repo scan (see services/repoScan.ts); facts, not AI. */
+  structure_json: import('../services/repoScan').RepoStructure | null;
   github_synced_at: string | null;
   github_readme_sha: string | null;
   readme_document_id: string | null;

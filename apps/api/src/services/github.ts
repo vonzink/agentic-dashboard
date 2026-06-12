@@ -1,4 +1,5 @@
 import type { GitHubRepoMeta } from '../types/domain';
+import type { TreeEntry } from './repoScan';
 
 /**
  * Read-only GitHub access for the Projects registry. Uses a fine-grained
@@ -12,6 +13,12 @@ export interface GitHubClient {
   getRepo(ownerRepo: string): Promise<GitHubRepoMeta>;
   /** README content + blob sha, or null when the repo has no README. */
   getReadme(ownerRepo: string): Promise<{ content: string; sha: string } | null>;
+  /** Full recursive file tree of a branch (paths + types). */
+  getTree(ownerRepo: string, branch: string): Promise<{ entries: TreeEntry[]; truncated: boolean }>;
+  /** Bytes per language. */
+  getLanguages(ownerRepo: string): Promise<Record<string, number>>;
+  /** Text content of one file, or null when missing/binary/oversized. */
+  getFile(ownerRepo: string, path: string): Promise<string | null>;
 }
 
 const REPO_RE = /^[\w.-]+\/[\w.-]+$/;
@@ -74,15 +81,68 @@ export class RealGitHubClient implements GitHubClient {
         : body.content;
     return { content, sha: body.sha };
   }
+
+  async getTree(
+    ownerRepo: string,
+    branch: string,
+  ): Promise<{ entries: TreeEntry[]; truncated: boolean }> {
+    assertRepoFormat(ownerRepo);
+    const res = await this.request(
+      `/repos/${ownerRepo}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
+      'application/vnd.github+json',
+    );
+    if (!res.ok) throw new Error(`GitHub API error for '${ownerRepo}' tree: HTTP ${res.status}`);
+    const body = (await res.json()) as {
+      tree?: { path: string; type: string; size?: number }[];
+      truncated?: boolean;
+    };
+    return {
+      entries: (body.tree ?? [])
+        .filter((t) => t.type === 'blob' || t.type === 'tree')
+        .map((t) => ({ path: t.path, type: t.type as 'blob' | 'tree', size: t.size })),
+      truncated: Boolean(body.truncated),
+    };
+  }
+
+  async getLanguages(ownerRepo: string): Promise<Record<string, number>> {
+    assertRepoFormat(ownerRepo);
+    const res = await this.request(`/repos/${ownerRepo}/languages`, 'application/vnd.github+json');
+    if (!res.ok) return {};
+    return (await res.json()) as Record<string, number>;
+  }
+
+  async getFile(ownerRepo: string, path: string): Promise<string | null> {
+    assertRepoFormat(ownerRepo);
+    const res = await this.request(
+      `/repos/${ownerRepo}/contents/${path.split('/').map(encodeURIComponent).join('/')}`,
+      'application/vnd.github+json',
+    );
+    if (!res.ok) return null;
+    const body = (await res.json()) as { content?: string; encoding?: string; size?: number };
+    if (!body.content || body.encoding !== 'base64' || (body.size ?? 0) > 200_000) return null;
+    return Buffer.from(body.content, 'base64').toString('utf8');
+  }
 }
 
 /** Used when GITHUB_TOKEN is unset: registry works, sync explains itself. */
 export class DisabledGitHubClient implements GitHubClient {
-  async getRepo(): Promise<GitHubRepoMeta> {
+  private fail(): never {
     throw new Error('GitHub sync is not configured (GITHUB_TOKEN unset)');
   }
+  async getRepo(): Promise<GitHubRepoMeta> {
+    this.fail();
+  }
   async getReadme(): Promise<null> {
-    throw new Error('GitHub sync is not configured (GITHUB_TOKEN unset)');
+    this.fail();
+  }
+  async getTree(): Promise<never> {
+    this.fail();
+  }
+  async getLanguages(): Promise<never> {
+    this.fail();
+  }
+  async getFile(): Promise<null> {
+    this.fail();
   }
 }
 
