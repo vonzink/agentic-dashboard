@@ -131,14 +131,15 @@ export class PgStore implements Store {
     create: async (p: NewProject): Promise<Project> => {
       const { rows } = await this.db.query(
         `INSERT INTO ai_projects (company_id, name, description, github_repo, live_url,
-           status, notes, github_meta_json, structure_json, github_synced_at,
-           github_readme_sha, readme_document_id, created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+           status, notes, github_meta_json, structure_json, import_graph_json,
+           github_synced_at, github_readme_sha, readme_document_id, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
         [
           p.company_id, p.name, p.description, p.github_repo, p.live_url,
           p.status, p.notes,
           p.github_meta_json ? JSON.stringify(p.github_meta_json) : null,
           p.structure_json ? JSON.stringify(p.structure_json) : null,
+          p.import_graph_json ? JSON.stringify(p.import_graph_json) : null,
           p.github_synced_at, p.github_readme_sha, p.readme_document_id, p.created_by,
         ],
       );

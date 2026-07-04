@@ -5,9 +5,11 @@ import {
   useGenerateMap,
   useProjectMap,
   useProjects,
+  useScanImports,
   useSyncProject,
   useUpdateProject,
 } from '../api/hooks';
+import { CodeGraph } from '../components/CodeGraph';
 import type {
   ArchComponent,
   ArchComponentKind,
@@ -140,6 +142,49 @@ function ArchDiagram({ map }: { map: ArchitectureMap }) {
   );
 }
 
+function CodeGraphSection({ project }: { project: Project }) {
+  const scan = useScanImports();
+  const [open, setOpen] = useState(false);
+  const graph = project.import_graph_json;
+
+  return (
+    <div style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <strong style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--msfg-teal)' }}>
+          Code graph
+        </strong>
+        {graph && (
+          <span className="muted" style={{ fontSize: 12 }}>
+            {graph.files_scanned} files · {graph.edges.length} imports · scanned {fmtDate(graph.scanned_at)}
+          </span>
+        )}
+        <span className="grow" />
+        {graph && (
+          <button className="btn sm ghost" onClick={() => setOpen(!open)}>
+            {open ? 'hide graph' : 'show graph'}
+          </button>
+        )}
+        <button
+          className="btn sm"
+          disabled={scan.isPending || !project.github_repo}
+          title="Parses import statements from source files — deterministic, no AI"
+          onClick={() => scan.mutate(project.id, { onSuccess: () => setOpen(true) })}
+        >
+          {scan.isPending ? 'Scanning…' : graph ? 'Rescan imports' : 'Scan imports'}
+        </button>
+      </div>
+      {scan.isError && <ErrorState error={scan.error} />}
+      {!graph && (
+        <p className="muted" style={{ fontSize: 12, margin: '6px 0 0' }}>
+          The Obsidian-style view: every source file is a node, every import an edge —
+          parsed from the code itself, no AI involved.
+        </p>
+      )}
+      {graph && open && <CodeGraph graph={graph} />}
+    </div>
+  );
+}
+
 function ArchitectureSection({ project }: { project: Project }) {
   const mapQuery = useProjectMap(project.id);
   const generate = useGenerateMap();
@@ -253,6 +298,8 @@ function ProjectCard({ project, isAdmin }: { project: Project; isAdmin: boolean 
       {project.structure_json && <StructureSection structure={project.structure_json} />}
 
       <ArchitectureSection project={project} />
+
+      <CodeGraphSection project={project} />
 
       <p style={{ margin: '8px 0 0', fontSize: 12 }}>
         <Link to={`/tasks?project=${project.id}`}>AI tasks for this project →</Link>

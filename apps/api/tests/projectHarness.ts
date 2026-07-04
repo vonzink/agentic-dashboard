@@ -52,7 +52,10 @@ export class FakeGitHub implements GitHubClient {
   async getLanguages(): Promise<Record<string, number>> {
     return { TypeScript: 9000, CSS: 800 };
   }
+  /** Per-test overridable file contents (import-graph tests). */
+  files: Record<string, string> = {};
   async getFile(_repo: string, path: string): Promise<string | null> {
+    if (this.files[path] !== undefined) return this.files[path];
     if (path === 'web/package.json') {
       return JSON.stringify({ dependencies: { react: '^18', vite: '^5' } });
     }

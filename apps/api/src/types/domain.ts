@@ -212,6 +212,8 @@ export interface Project {
   github_meta_json: GitHubRepoMeta | null;
   /** Deterministic repo scan (see services/repoScan.ts); facts, not AI. */
   structure_json: import('../services/repoScan').RepoStructure | null;
+  /** Deterministic file-level import graph (see services/importScan.ts). */
+  import_graph_json: import('../services/importScan').ImportGraph | null;
   github_synced_at: string | null;
   github_readme_sha: string | null;
   readme_document_id: string | null;

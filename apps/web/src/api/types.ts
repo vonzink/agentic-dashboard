@@ -435,6 +435,23 @@ export interface ArchitectureMap {
   confidence_label?: ConfidenceLabel;
 }
 
+/** Deterministic file-level import graph (parsed, not AI). */
+export interface ImportGraphNode {
+  id: string;
+  dir: string;
+  external: boolean;
+  imports: number;
+  imported_by: number;
+}
+
+export interface ImportGraph {
+  nodes: ImportGraphNode[];
+  edges: { from: string; to: string }[];
+  files_scanned: number;
+  files_skipped: number;
+  scanned_at: string;
+}
+
 export interface Project {
   id: string;
   company_id: string;
@@ -446,6 +463,7 @@ export interface Project {
   notes: string | null;
   github_meta_json: GitHubRepoMeta | null;
   structure_json: RepoStructure | null;
+  import_graph_json: ImportGraph | null;
   github_synced_at: string | null;
   github_readme_sha: string | null;
   readme_document_id: string | null;

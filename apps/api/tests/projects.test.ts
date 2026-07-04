@@ -117,7 +117,7 @@ describe('projects registry', () => {
     const foreign = await store.projects.create({
       company_id: acme.id, name: 'acme-site', description: null, github_repo: null,
       live_url: null, status: 'active', notes: null, github_meta_json: null,
-      structure_json: null, github_synced_at: null, github_readme_sha: null,
+      structure_json: null, import_graph_json: null, github_synced_at: null, github_readme_sha: null,
       readme_document_id: null, created_by: 'admin@test.local',
     });
     await request(app)
@@ -133,7 +133,7 @@ describe('projects registry', () => {
     const project = await store.projects.create({
       company_id: msfg.id, name: 'p', description: null, github_repo: 'vonzink/p',
       live_url: null, status: 'active', notes: null, github_meta_json: null,
-      structure_json: null, github_synced_at: null, github_readme_sha: null,
+      structure_json: null, import_graph_json: null, github_synced_at: null, github_readme_sha: null,
       readme_document_id: null, created_by: 'admin@test.local',
     });
     const res = await request(app).post(`/api/ai/projects/${project.id}/sync`).set(as.operator);

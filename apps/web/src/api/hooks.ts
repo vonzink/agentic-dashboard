@@ -394,6 +394,14 @@ export function useUpdateProject() {
   });
 }
 
+export function useScanImports() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<Project>(`/projects/${id}/scan-imports`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
+  });
+}
+
 export function useSyncProject() {
   const qc = useQueryClient();
   return useMutation({

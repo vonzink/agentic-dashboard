@@ -5,6 +5,7 @@ import type { AuditService } from './audit';
 import type { CompanyService } from './companies';
 import type { DocumentService } from './documents';
 import { assertRepoFormat, type GitHubClient } from './github';
+import { buildImportGraph, pickSourceFiles } from './importScan';
 import { manifestPathsToFetch, scanRepo, type RepoStructure } from './repoScan';
 import type { RunService } from './runs';
 import type { TaskService } from './tasks';
@@ -62,6 +63,7 @@ export class ProjectService {
       notes: body.notes ?? null,
       github_meta_json: null,
       structure_json: null,
+      import_graph_json: null,
       github_synced_at: null,
       github_readme_sha: null,
       readme_document_id: null,
@@ -182,6 +184,48 @@ export class ProjectService {
       },
     });
     return updated;
+  }
+
+  /**
+   * Code-level import graph: fetches up to IMPORT_SCAN_FILE_CAP source
+   * files and parses their import statements. Deterministic — every node
+   * and edge is a parsed fact; the file cap is reported, never silent.
+   */
+  async scanImports(actor: AuthUser, id: string): Promise<Project> {
+    const project = await this.get(id);
+    if (!project.github_repo) {
+      throw ApiError.conflict('NO_REPO', `Project '${project.name}' has no github_repo set`);
+    }
+    try {
+      const meta = project.github_meta_json ?? (await this.github.getRepo(project.github_repo));
+      const tree = await this.github.getTree(project.github_repo, meta.default_branch);
+      const { files, skipped } = pickSourceFiles(tree.entries);
+      const contents: Record<string, string> = {};
+      for (const path of files) {
+        const content = await this.github.getFile(project.github_repo, path);
+        if (content !== null) contents[path] = content;
+      }
+      const graph = buildImportGraph(contents, skipped);
+      const updated = (await this.store.projects.update(id, { import_graph_json: graph }))!;
+      await this.audit.record('project.imports_scanned', {
+        actor: actor.email,
+        companyId: updated.company_id,
+        payload: {
+          project_id: id,
+          repo: project.github_repo,
+          files_scanned: graph.files_scanned,
+          files_skipped: graph.files_skipped,
+          edges: graph.edges.length,
+        },
+      });
+      return updated;
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      throw ApiError.conflict(
+        'GITHUB_SYNC_FAILED',
+        err instanceof Error ? err.message : 'GitHub request failed',
+      );
+    }
   }
 
   /**

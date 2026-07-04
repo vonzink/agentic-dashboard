@@ -83,6 +83,7 @@ export type ProjectPatch = Partial<
     | 'notes'
     | 'github_meta_json'
     | 'structure_json'
+    | 'import_graph_json'
     | 'github_synced_at'
     | 'github_readme_sha'
     | 'readme_document_id'

@@ -327,6 +327,11 @@ export function buildRouter(s: Services): Router {
     res.json({ output: await s.projects.latestMap(param(req, 'id')) });
   });
 
+  // Deterministic file-level import graph (the "code brain" view).
+  r.post('/projects/:id/scan-imports', requireRole('operator'), async (req, res) => {
+    res.json(await s.projects.scanImports(currentUser(req), param(req, 'id')));
+  });
+
   // ----- eval sets -----------------------------------------------------------------
   // Saved test inputs per workflow, run against a prompt version before
   // activating it. Sandboxed: no tasks/outputs/review-queue side effects.
